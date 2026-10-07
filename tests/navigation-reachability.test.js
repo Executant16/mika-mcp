@@ -56,7 +56,7 @@ test('every way into the settings surface still lands on a page that exists', ()
     '★ 工具栏 preload 必须把页面名透传给主进程');
   assert.match(main, /secureHandle\('manager:open'[\s\S]{0,160}?openSettingsSurface\(targetPage\)/,
     '★ 主进程必须把 manager:open 的页面名交给 openSettingsSurface');
-  assert.match(main, /webContents\.send\('settings:navigate', initialPage\)/,
+  assert.match(main, /webContents\.send\('settings:navigate', targetPage\)/,
     '★ openSettingsSurface 必须真的把页面名送进设置渲染进程 —— 只 show() 窗口不算导航');
   assert.match(preload, /ipcRenderer\.on\('settings:navigate'/,
     '★ 设置渲染进程必须订阅 settings:navigate，否则主进程发的页面名没人接');

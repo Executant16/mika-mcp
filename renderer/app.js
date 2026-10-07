@@ -1685,7 +1685,6 @@ function applyFormValues(snapshot, force = false) {
 }
 
 function renderSnapshot(snapshot, options = {}) {
-  sanitizeSnapshotWorkspaces(snapshot);
   state.snapshot = snapshot;
   applyFormValues(snapshot, options.forceForms);
   const { settings, secrets, environment, status } = snapshot;
@@ -1832,7 +1831,7 @@ function handleOverviewHeroAction() {
   } else if (action === 'guide') {
     navigate('guide');
   } else if (action === 'tasks') {
-    navigate('tasks');
+    navigate('logs');
   } else if (action === 'chatgpt') {
     if (api?.openExternal) {
       api.openExternal('https://chatgpt.com').catch(() => {});
@@ -3854,6 +3853,24 @@ const FALLBACK_HEALTH_GROUPS = [
   { id: 'tunnel', title: '连接通道（OpenAI Tunnel）', hint: '把本机端口安全地暴露给 ChatGPT' },
 ];
 
+function orderHealthChecks(report) {
+  const checks = Array.isArray(report?.checks) ? report.checks : [];
+  const GROUP_DEFS = Array.isArray(report?.groups) && report.groups.length
+    ? report.groups : FALLBACK_HEALTH_GROUPS;
+  const claimed = new Set();
+  const ordered = [];
+  for (const def of GROUP_DEFS) {
+    for (const item of checks) {
+      if (item.group === def.id && !claimed.has(item)) {
+        ordered.push(item);
+        claimed.add(item);
+      }
+    }
+  }
+  const orphans = checks.filter((item) => !claimed.has(item));
+  return [...ordered, ...orphans];
+}
+
 /* 分组块：一个分组标题（图标 + 标题 + 说明）+ 该分组下的紧凑检查行。
  * 复用 styles.css 里既有的 .health-group-* 规则，不新增样式。 */
 function healthGroupBlock(def, items) {
@@ -4254,7 +4271,7 @@ function createHealthPassedItem(check) {
 }
 
 function renderHealth(report) {
-  const checks = report?.checks || [];
+  const checks = orderHealthChecks(report);
   const failed = checks.filter((item) => !item.ok);
   const passed = checks.filter((item) => item.ok);
 
@@ -4275,7 +4292,7 @@ function renderHealth(report) {
     if (bannerTitle) bannerTitle.textContent = `还差 ${failed.length} 项即可使用`;
     if (bannerDesc) bannerDesc.textContent = '基础环境正常，完成配置并启动服务即可建立连接。';
     if (repairBtn) {
-      repairBtn.textContent = '一键处理';
+      repairBtn.textContent = '自动修复';
       repairBtn.disabled = false;
       repairBtn.className = 'primary-button btn-sm';
     }
@@ -4416,7 +4433,7 @@ async function repairHealth() {
       toast('全部就绪', '本地服务与 ChatGPT 连接已成功建立并通过所有检查。', 'success');
       setTimeout(() => { if (btn) { btn.textContent = '服务正常'; btn.disabled = true; } }, 2500);
     } else {
-      btn.textContent = '一键处理';
+      btn.textContent = '自动修复';
       // 智能引导至第一个卡点
       const firstIssue = failed[0];
       if (firstIssue?.id === 'workspace') {
@@ -4434,7 +4451,7 @@ async function repairHealth() {
       }
     }
   } catch (error) {
-    btn.textContent = '一键处理';
+    btn.textContent = '自动修复';
     toast('处理遇到问题', error.message, 'error');
   } finally {
     btn.disabled = false;
@@ -5116,7 +5133,6 @@ function bindEvents() {
   $('#overviewHeroActionBtn')?.addEventListener('click', () => {
     handleOverviewHeroAction();
   });
-  $('#taskActivityViewBtn')?.addEventListener('click', () => navigate('tasks'));
   $('#summaryItemWorkspace')?.addEventListener('click', () => chooseWorkspace());
   $('#summaryItemMcp')?.addEventListener('click', () => {
     const isRunning = Boolean(state.snapshot?.status?.runtimeRunning);

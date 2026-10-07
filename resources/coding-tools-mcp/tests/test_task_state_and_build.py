@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tempfile
 import time
@@ -445,6 +446,45 @@ class PermissionPolicyTests(unittest.TestCase):
 
 
 class BuildVerificationTests(unittest.TestCase):
+    @unittest.skipUnless(sys.platform == "win32", "Windows short paths only")
+    def test_collect_artifacts_normalizes_windows_short_root(self) -> None:
+        import ctypes
+        from ctypes import wintypes
+
+        get_short_path = ctypes.WinDLL("kernel32", use_last_error=True).GetShortPathNameW
+        get_short_path.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD]
+        get_short_path.restype = wintypes.DWORD
+        with tempfile.TemporaryDirectory(prefix="mika artifact paths ") as temp:
+            root = Path(temp).resolve()
+            artifact = root / "dist" / "demo.exe"
+            artifact.parent.mkdir()
+            artifact.write_bytes(b"artifact")
+            required = get_short_path(str(root), None, 0)
+            if not required:
+                raise ctypes.WinError(ctypes.get_last_error())
+            buffer = ctypes.create_unicode_buffer(required)
+            if not get_short_path(str(root), buffer, required):
+                raise ctypes.WinError(ctypes.get_last_error())
+            short_root = Path(buffer.value)
+            if short_root == root:
+                self.skipTest("This volume does not expose a distinct short path")
+            artifacts = collect_artifacts(short_root, ["dist"], "sha256", 0)
+            self.assertEqual(len(artifacts), 1)
+            self.assertEqual(artifacts[0]["path"], "dist/demo.exe")
+            self.assertEqual(artifacts[0]["sha256"], collect_artifacts(root, ["dist"], "sha256", 0)[0]["sha256"])
+
+    def test_collect_artifacts_normalizes_relative_root(self) -> None:
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp:
+            root = Path(temp)
+            artifact = root / "dist" / "demo.exe"
+            artifact.parent.mkdir()
+            artifact.write_bytes(b"artifact")
+            relative_root = Path(os.path.relpath(root, Path.cwd()))
+            artifacts = collect_artifacts(relative_root, ["dist"], "sha256", 0)
+            self.assertEqual(len(artifacts), 1)
+            self.assertEqual(artifacts[0]["path"], "dist/demo.exe")
+            self.assertEqual(artifacts[0]["sha256"], collect_artifacts(root.resolve(), ["dist"], "sha256", 0)[0]["sha256"])
+
     def test_detects_node_project_and_hashes_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

@@ -151,11 +151,13 @@
   --radius-7:      7px;
   --radius-9:      9px;
   --radius-10:     10px;
+  --radius-11:     11px;
   --radius-13:     13px;
   --radius-14:     14px;
   --radius-15:     15px;
   --radius-16:     16px;
   --radius-22:     22px;
+  --radius-24:     24px;
   --radius-pill:   999px;
 
   /* ---- 字号尺度（19 档收敛为 6 档）-------------------------------------
@@ -236,9 +238,13 @@
   --fs-14-5:  14.5px; /* 卡片级标题：.task-card-title、.health-issue-title、.guide-step-row-title…共 5 处 */
   --fs-15:    15px;   /* 区块 h3 与紧凑行名：.settings-section-heading h3、.deploy-card-heading h3、.compact-row-name…共 9 处 */
   --fs-15-5:  15.5px; /* 任务区块 h3（.task-section-card .settings-section-heading h3），单处 */
+  --fs-16-5:  16.5px; /* 历史值：概览模块标题，保值令牌化 */
   --fs-17-5:  17.5px; /* 第 45 轮补：界面重写引入的唯一一档 17.5px 字号，按原值新增 */
+  --fs-17:    17px;   /* 历史值：构建状态标题，保值令牌化 */
+  --fs-19:    19px;   /* 历史值：区块标题，保值令牌化 */
   --fs-18:    18px;   /* 页面主标题：.topbar h1、.overview-hero-title，共 2 处 */
   --fs-22:    22px;   /* 指标大字（.metric-value-display），单处 */
+  --fs-21:    21px;   /* 历史值：概览状态标题，保值令牌化 */
   --fs-23:    23px;   /* 第 45 轮补：.topbar h1 在重写后用的是 23px（与 --fs-22 不等，故单独一档） */
 
   /* ---- 字体族（第 31 轮新增）-------------------------------------------
@@ -347,7 +353,7 @@ body[data-theme="light"] {
 
   --text:          #1f2328;
   --muted:         #656d76;
-  --muted-2:       #8c959f;
+  --muted-2:       #68727d;
   --text-3:        #57606a;
 
   /* ---- 强调色（本次修订补齐）--------------------------------------------

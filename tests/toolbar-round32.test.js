@@ -170,7 +170,7 @@ function isLightSurface(value) {
   return false;
 }
 
-test('the health pill collapses two status lights into one conclusion, and its text is computed, not hard-coded', () => {
+test('the health pill collapses two status lights into one conclusion and opens its native detail dropdown', () => {
   /* 第 32 轮（用户第 3 条）：「将分散的红绿灯状态整合为一个紧凑的健康状态胶囊：
    * 例如 `[ 🔴 服务未启动 · 2 项异常 ▾ ]`，点击展开查看本地工具与连接通道详情，
    * 而不是在外面散落多个红点文字。」
@@ -219,7 +219,7 @@ test('the health pill collapses two status lights into one conclusion, and its t
    *   "哪一项断了 / 去哪里修"重新变成用户查不到的信息：
    *     · 收起态点名单项异常（上面已逐档真跑 healthPillText）；
    *     · 悬浮 title 同时列出两项各自的状态；
-   *     · 异常时点击直接跳「运行与连接」设置页。 */
+   *     · 点击胶囊打开原生健康下拉面板，明细不再依赖隐藏的旧弹层。 */
   const cssCode = read('renderer/browser.css').replace(/\/\*[\s\S]*?\*\//g, '');
   const htmlCode = stripHtml(html);
   const pillFn = source.match(/function renderHealthPill\(mcpRunning, tunnelRunning\)\s*\{[\s\S]*?\n\}/)?.[0] || '';
@@ -232,13 +232,23 @@ test('the health pill collapses two status lights into one conclusion, and its t
   assert.match(pillFn, /textContent = healthPillText\(mcpRunning, tunnelRunning, checking\)/,
     '收起态文案必须来自那个纯函数（不得在渲染函数里另写一份字面量）');
 
-  /* ③ 异常时必须真的能一步跳到设置页（"点击前往配置"不能只是文案）。 */
-  const pillClick = source.match(/\$\('#healthPill'\)\.onclick = \(event\) => \{[\s\S]*?\n\};/)?.[0] || '';
+  /* ③ 点击胶囊必须真的打开当前健康下拉面板。新版把明细交给原生
+   *    popupHealthDropdown，不能再用旧版 openSettings('deploy') 的跳转契约。 */
+  const pillClick = source.match(/const pillBtn = \$\('#healthPill'\);[\s\S]*?pillBtn\.onclick = \(event\) => \{[\s\S]*?\n\s*\};/)?.[0] || '';
   assert.ok(pillClick, '应能截出 #healthPill 的点击处理');
-  assert.match(pillClick, /if \(!mcpRunning \|\| !tunnelRunning\)/,
-    '★ 只有异常时才跳设置 —— 正常态点击不该把用户带走');
-  assert.match(pillClick, /api\.openSettings\('deploy'\)/,
-    '★ 异常时点击必须把用户送到「运行与连接」设置页');
+  assert.match(pillClick, /event\.stopPropagation\(\)/,
+    '健康胶囊点击应阻止事件继续冒泡');
+  assert.match(pillClick, /toggleHealthDropdown\(\)/,
+    '健康胶囊点击应调用统一的下拉切换函数');
+  const dropdownFn = extractFunction(source, 'toggleHealthDropdown');
+  assert.match(dropdownFn, /const pill = \$\('#healthPill'\)/,
+    '下拉切换应从健康胶囊读取定位元素');
+  assert.match(dropdownFn, /const rect = pill\.getBoundingClientRect\(\)/,
+    '下拉面板应使用胶囊的真实位置');
+  assert.match(dropdownFn, /api\.popupHealthDropdown\(\{/,
+    '下拉切换应调用主进程健康下拉面板');
+  assert.match(dropdownFn, /x: Math\.round\(rect\.left\)/,
+    '下拉面板横坐标应来自健康胶囊');
 
   /* ③b 披露关系必须自洽：不得对**永久打不开**的节点声明披露。
    *

@@ -23,22 +23,22 @@ test('legacy icon files are not used as build inputs', () => {
   assert.equal(fs.existsSync(path.join(root, 'build', 'icon.png')), false);
 });
 
-test('the three in-app brand marks are byte-identical and share the icon generator\'s geometry', () => {
+test('the in-app SVG brand marks are byte-identical and share the icon generator\'s geometry', () => {
   /* 第 29 轮（用户第 8 条）：「网页 MCP 助手的图标怎么改掉了？上一版的问题就是
    * 图标偏移了，你怎么改掉了？」
    *
    * ★ 现场还原：原始品牌标记（见归档-原始文件/index.html.原始备份 第 17 行）是
    *     <path d="M6.5 7.1 11.3 12 6.5 16.9"/> + <path d="M13.5 16.9H17.6"/>
    *   —— 终端提示符 ›_，与 scripts/generate-icon.js 画的是同一个符号。
-   *   第 14 轮之后某一轮，渲染层这三处被改成了"窗口框 + 双尖角"，
+   *   第 14 轮之后某一轮，渲染层的品牌标记被改成了"窗口框 + 双尖角"，
    *   而应用图标（app-icon.png / .ico）没跟着换 —— 于是同一个应用里有了两套造型。
    *   用户看到的"图标改掉了"就是这个：托盘/任务栏是 ›_，界面里却不是。
    *
    * 这条护栏要挡的正是**两套造型再次分叉**，所以判据不能是"index.html 里有 svg"
-   * （那太弱），也不能只是"三处彼此相同"（三处可以一起被改错），
+   * （那太弱），也不能只是"两处彼此相同"（两处可以一起被改错），
    * 必须把它们与**唯一真源** generate-icon.js 对齐：
    *   从生成器解析出 512 画布上的 CHEVRON / UNDERSCORE 坐标，
-   *   按 24/512 换算成 viewBox 24 下的值，再要求三处 <path> 逐字匹配。
+   *   按 24/512 换算成 viewBox 24 下的值，再要求两处 <path> 逐字匹配。
    * 这样"改生成器不改界面"和"改界面不改生成器"都会红。 */
   const html = fs.readFileSync(path.join(root, 'renderer', 'index.html'), 'utf8');
   const generator = fs.readFileSync(path.join(root, 'scripts', 'generate-icon.js'), 'utf8');
@@ -64,20 +64,19 @@ test('the three in-app brand marks are byte-identical and share the icon generat
   const expectedChevron = `<path d="M${f(c[0])} ${f(c[1])} ${f(c[2])} ${f(c[3])} ${f(c[4])} ${f(c[5])}" stroke="#ffffff"/>`;
   const expectedUnder = `<path d="M${f(u[0])} ${f(u[1])}H${f(u[2])}" stroke="#6c8cff"/>`;
 
-  /* 三处的容器类名各不相同（实测）：
+  /* 当前两处内联 SVG 的容器类名各不相同（实测）：
    *   .boot-logo           启动遮罩
    *   .brand-mark          侧栏
-   *   .brand-mark.large    关于面板
-   * 所以按"是否含这一个定位 path"来数，而不是按容器类名 ——
-   * 用 class="brand-mark 前缀只会数到 2 处（第一次跑就红了，记在这里）。 */
-  assert.equal(html.split(expectedChevron).length - 1, 3,
-    `三处品牌标记的尖角必须逐字等于从 generate-icon.js 换算出的几何：${expectedChevron}`);
-  assert.equal(html.split(expectedUnder).length - 1, 3,
-    `三处品牌标记的下划线必须逐字等于从 generate-icon.js 换算出的几何：${expectedUnder}`);
-  /* 附带守一下"这三处仍然存在"：只有三处 path 匹配、却没有任何容器，
+   * 关于页当前使用 mascot.jpg，不再重复内联品牌 SVG。
+   * 所以按"是否含这一个定位 path"来数，而不是按容器类名。 */
+  assert.equal(html.split(expectedChevron).length - 1, 2,
+    `两处品牌标记的尖角必须逐字等于从 generate-icon.js 换算出的几何：${expectedChevron}`);
+  assert.equal(html.split(expectedUnder).length - 1, 2,
+    `两处品牌标记的下划线必须逐字等于从 generate-icon.js 换算出的几何：${expectedUnder}`);
+  /* 附带守一下"这两处仍然存在"：只有两处 path 匹配、却没有任何容器，
    * 说明它们被塞进了别的地方（或重复到第四个位置）。 */
-  assert.equal((html.match(/class="brand-mark/g) || []).length, 2,
-    '侧栏与关于面板应有 .brand-mark 容器（+ 启动遮罩的 .boot-logo）');
+  assert.equal((html.match(/class="brand-mark/g) || []).length, 1,
+    '侧栏应有 .brand-mark 容器（+ 启动遮罩的 .boot-logo；关于页使用头像图片）');
   assert.equal((html.match(/class="boot-logo"/g) || []).length, 1,
     '启动遮罩应有 .boot-logo 容器');
 
@@ -92,8 +91,8 @@ test('the three in-app brand marks are byte-identical and share the icon generat
   /* 两个色值也必须与生成器一致（白 + 强调蓝 #6c8cff），
    * 否则会变成"形状一样但配色不同"的另一种分叉。 */
   assert.match(generator, /\[108, 140, 255, 255\]/, '生成器的下划线应使用强调蓝 rgb(108,140,255)');
-  assert.equal((html.match(/stroke="#6c8cff"/g) || []).length, 3,
-    '三处下划线都应是 #6c8cff（=rgb(108,140,255)）');
+  assert.equal((html.match(/stroke="#6c8cff"/g) || []).length, 2,
+    '两处下划线都应是 #6c8cff（=rgb(108,140,255)）');
 
   /* ★ 第 30 轮补充（负向验证抓到的缺口）：上面只比对了**坐标**，
    *   把生成器的 SW 从 61.674 改回 44 时，测试仍然全绿 ——
@@ -104,8 +103,8 @@ test('the three in-app brand marks are byte-identical and share the icon generat
    *   3.11 这个数字由"字形占画布 72% × 笔宽/字宽 16.73%"唯一决定，
    *   生成器的 SW 一改，这里就会跟着变，与 CSS 里写死的值对不上 → 红。
    *
-   *   断言的是 CSS 中**三处** svg 的 stroke-width 都属于同一个值，
-   *   而不只是"存在一个等于期望值的"：四处徽标本来就是同一个符号，
+   *   断言的是 CSS 中**两处** svg 的 stroke-width 都属于同一个值，
+   *   而不只是"存在一个等于期望值的"：两处徽标本来就是同一个符号，
    *   允许它们各不相同等于允许分叉。 */
   const swMatch = generator.match(/const SW = ([\d.]+);/);
   assert.ok(swMatch, 'generate-icon.js 应定义 SW（笔画宽度）');

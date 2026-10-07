@@ -229,6 +229,7 @@ def _hash_file(path: Path, algorithm: str) -> str:
 
 
 def collect_artifacts(root: Path, patterns: list[str], algorithm: str, started_ns: int) -> list[dict[str, Any]]:
+    root = root.resolve()
     found: dict[Path, None] = {}
     for raw in patterns:
         candidate = (root / raw).resolve()

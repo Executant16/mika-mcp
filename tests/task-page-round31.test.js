@@ -23,7 +23,7 @@ const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
  *   （文字挤压、字符重叠错位、笔画变形）正是它造成的 ——
  *   没有护栏的一类样式，就会长期无人看守。
  * ========================================================================== */
-test('the round-31 task page repairs its type rendering, drops the fake console box, and ranks its buttons', () => {
+test('the round-31 build section repairs its type rendering, drops the fake console box, and ranks its buttons', () => {
   const css = read('renderer/styles.css');
   const browserCss = read('renderer/browser.css');
   const tokens = read('renderer/design-tokens.css');
@@ -125,51 +125,51 @@ test('the round-31 task page repairs its type rendering, drops the fake console 
     '★ appendBuildOutput 应以"提示符节点是否还在"判断要不要清空 —— '
     + '比对具体文案的话，换个提示符文案就会让第一行日志与提示符拼在一起');
 
-  /* ══ ④ 按钮主次：构建验证区块里唯一的 Primary 是「开始验证」 ═════════
+  /* ══ ④ 按钮主次：构建验证区块保留独立的开始验证动作 ════════════════
    * ★ 第 41 轮重锚：原切片从**全文件第一个** `class="settings-section"` 起算，
-   *   而构建区块已搬到偏好设置页的第 4 张 advanced-card-block ——
-   *   那个起点在运行与连接页，于是切片沿途把所有页面的主按钮都捞了进来
-   *   （实得 copyTestPromptBtn / copyCustomInstructions / repairHealth / saveRuntimeKey），
-   *   报出的是"主操作不止一个"这种与技术事实不符的结论。
-   *   新切片锚在构建区块自己身上：从容纳 #buildProjectType 的那张卡片起，
-   *   到它所在的高级设置区结束。 */
+   *   而构建区块已搬到偏好设置页的独立 settings-section ——
+   *   若误从其他页面起算，就会把 copyTestPromptBtn / copyCustomInstructions /
+   *   repairHealth / saveRuntimeKey 一并捞进来，报出"主操作不止一个"这种
+   *   与技术事实不符的结论。新切片锚在包含 #buildProjectType 的 settings-section。 */
   const buildTypeIdx = htmlCode.indexOf('id="buildProjectType"');
   assert.ok(buildTypeIdx > 0, '应能找到构建区块的 #buildProjectType（构建与验证区块的锚点）');
-  const buildCardStart = htmlCode.lastIndexOf('<div class="advanced-card-block">', buildTypeIdx);
-  assert.ok(buildCardStart >= 0, '构建区块应落在一个 advanced-card-block 里');
+  const buildCardStart = htmlCode.lastIndexOf('<section class="settings-section">', buildTypeIdx);
+  assert.ok(buildCardStart >= 0, '构建区块应落在一个 settings-section 里');
   const buildSectionEnd = htmlCode.indexOf('</section>', buildTypeIdx);
   const buildSectionMatch = [htmlCode.slice(buildCardStart, buildSectionEnd)];
   assert.ok(buildSectionMatch[0].includes('id="runBuild"'), '应能截出构建与验证区块正文');
-  const primaryButtons = [...buildSectionMatch[0].matchAll(/class="primary-button[^"]*" id="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(primaryButtons, ['runBuild'],
-    '★ 构建验证的主操作只能有一个（「开始验证」）。改前「重新识别项目」也是实底按钮，'
-    + `两个同权重并排 → 用户看不出哪个是主动作。实得：${JSON.stringify(primaryButtons)}`);
+  const runBuildTag = buildSectionMatch[0].match(/<button[^>]*id="runBuild"[^>]*>/)?.[0] || '';
+  assert.ok(runBuildTag, '构建验证区块必须保留「开始验证」动作');
+  assert.match(runBuildTag, /class="btn-sm subtle-action-btn"/,
+    '「开始验证」应使用当前控制台标题栏的小型动作按钮样式');
+  assert.doesNotMatch(runBuildTag, /danger-button/,
+    '「开始验证」不是破坏性操作');
   assert.match(buildSectionMatch[0], /class="secondary-button[^"]*" id="inspectBuild"/,
     '★ 「重新识别项目」必须降为次级样式');
 
-  /* 破坏性按钮：无任务时不得出现。
-   * ★ 这里**不能**用 `/<button class="danger-button" id="clearTaskState" hidden>/`
-   *   这种逐字匹配 —— 它太脆，多挂一个 `style="display:none"` 或调一下
-   *   属性顺序就会假红，而那两件事都不改变"按钮默认不可见"这个性质。
-   *   （这条是负向验证的**对照实验④d 逼出来的**：语义等价的改写把护栏搞红了，
-   *     报出的却是"破坏键常驻"—— 一条与技术事实不符的错误结论。）
-   *   改成按**属性语义**断言：它必须是 danger-button、必须带 hidden。 */
+  /* 破坏性按钮：无任务时不得出现在当前界面。
+   * 当前任务页已收进首页任务活动，旧操作节点只作为隐藏兼容桩保留；
+   * 因此断言它所在的兼容容器保持 hidden，而不是要求旧页面的 danger-button 类。 */
   const clearStateTag = htmlCode.match(/<button[^>]*id="clearTaskState"[^>]*>/)?.[0] || '';
-  assert.ok(clearStateTag, '任务页应有「清除任务状态」按钮');
-  assert.match(clearStateTag, /class="danger-button"/,
-    '★ 「清除任务状态」应保持危险动作的视觉身份');
-  assert.match(clearStateTag, /\shidden(?=[\s>])/,
-    '★ 「清除任务状态」必须默认 hidden —— 空闲时把红色破坏性按钮摆在最显眼处，'
-    + '会让整页看起来像"有个危险操作待确认"');
+  assert.ok(clearStateTag, '兼容节点应保留清除任务状态的事件接线');
+  const clearStateIndex = htmlCode.indexOf(clearStateTag);
+  const clearStateCompatStart = htmlCode.lastIndexOf('<div hidden', clearStateIndex);
+  const clearStateCompat = htmlCode.slice(clearStateCompatStart, clearStateIndex + clearStateTag.length);
+  assert.ok(clearStateCompatStart >= 0, '清除任务状态节点应位于隐藏兼容容器内');
+  assert.match(clearStateCompat, /aria-hidden="true"/,
+    '★ 清除任务状态兼容节点必须默认对用户隐藏，避免空闲时出现破坏性按钮');
   /* ★ 允许 `if (clearState) {` 的块写法：这条判据守的是"显隐由 hasTask 决定"，
    *   不是"必须写成单行"。块里额外补的那句 display 覆盖是为了盖过
    *   开发者分组容器的 display 规则，不改变这个结论。 */
   assert.match(appCode, /if \(clearState\)\s*\{?\s*clearState\.hidden = !hasTask;/,
     '★ 它的显隐必须由 hasTask 决定（有任务才有可清的状态）');
 
-  /* 次级入口「历史运行记录」必须真的存在且能跳到历史面板 */
-  assert.match(htmlCode, /class="secondary-button" id="jumpTaskHistory"/,
-    '★ 应提供查看「历史运行记录」的次级入口（用户第 4 条）');
+  /* 任务页已收进首页任务活动；旧的历史跳转只在隐藏兼容区保留接线。 */
+  const jumpHistoryTag = htmlCode.match(/<button[^>]*id="jumpTaskHistory"[^>]*>/)?.[0] || '';
+  assert.ok(jumpHistoryTag, '历史运行记录兼容节点应保留事件接线');
+  const jumpHistoryIndex = htmlCode.indexOf(jumpHistoryTag);
+  const jumpHistoryCompatStart = htmlCode.lastIndexOf('<div hidden', jumpHistoryIndex);
+  assert.ok(jumpHistoryCompatStart >= 0, '历史运行记录兼容节点应位于隐藏容器内');
   assert.match(appCode, /if \(taskHistoryCollapsed\(\)\) setTaskHistoryCollapsed\(false\);/,
     '★ 跳转前必须先展开历史面板 —— 收起状态下滚过去只能看到一条标题条，'
     + '而用户的意图是"看记录"');
@@ -201,32 +201,34 @@ test('the round-31 task page repairs its type rendering, drops the fake console 
    *   （这条也是负向验证的 ⑤b 逼出来的：删掉构建区块的说明，护栏 SURVIVED。
    *     全页范围的断言会互相遮蔽，必须收窄到被测的那个区块。）
    *
-   * ★ 第 41 轮重锚：原判据要求构建区块里有一个 `?` 悬浮提示
-   *   （class="field-tip" title="…"，切片锚在 `<h3>构建与验证</h3>` 上）。
-   *   后续界面重写把这页改成"卡片 + 行"结构：
-   *     · 标题从 h3 变成每张卡片自己的 h4（项目识别与方案 / 构建与测试策略 / 验证控制台）；
-   *     · 说明从"藏在 ? 里"改成**逐行常显**的 .advanced-row-desc ——
-   *       这比悬停更好（不用鼠标就能读到），所以不是信息缩水，是换了呈现。
-   *   判据跟着"信息必须还在"这个意图走，锚点换成新结构：
-   *   构建区块里**每个可配置项**都必须带一句不短于 10 字的说明，
-   *   并且"每行都有"这件事本身就是判据（只查一处，删掉另外四处仍会绿）。 */
+   * ★ 第 41 轮重锚：界面现在用两张流水线阶段卡承载构建设置。
+   *   阶段说明由 .pipeline-stage-desc 常显，三个命令/产物输入由
+   *   .pipeline-field-label 明确标注；不再使用旧版 .advanced-row-desc。
+   *   判据跟着"信息必须还在"这个意图走，分别检查两条阶段说明和三个字段标签，
+   *   防止重构时只保留输入框而丢掉用户可读的上下文。 */
   const panelStartIdx = htmlCode.indexOf('id="buildProjectType"');
   const buildWrapIdx = htmlCode.indexOf('id="buildReportWrap"');
   assert.ok(panelStartIdx > 0 && buildWrapIdx > panelStartIdx,
     '应能截出「构建与验证」面板的标记');
   const buildPanel = htmlCode.slice(panelStartIdx, buildWrapIdx);
-  const rowDescs = [...buildPanel.matchAll(/class="advanced-row-desc">([^<]+)</g)]
+  const rowDescs = [...buildPanel.matchAll(/class="pipeline-stage-desc">([^<]+)</g)]
     .map((m) => m[1].trim());
-  assert.equal(rowDescs.length, 5,
-    '★ 构建区块有 5 个可配置项（跑测试 / 跑构建 / 测试命令 / 构建命令 / 产物目录），'
-    + `每一项都要有一句常显说明 —— 实得 ${rowDescs.length} 条：${JSON.stringify(rowDescs)}`);
+  assert.equal(rowDescs.length, 2,
+    '★ 构建区块的两条流水线阶段都必须有常显说明 —— '
+    + `实得 ${rowDescs.length} 条：${JSON.stringify(rowDescs)}`);
   for (const desc of rowDescs) {
     assert.ok(desc.length >= 10,
-      `★ 说明不得缩水成空占位（原 ? 里的长说明要搬过来，不能只留一句"自定义"）：`
+      `★ 阶段说明不得缩水成空占位：`
       + `「${desc}」只有 ${desc.length} 字`);
   }
-  assert.match(cssCode, /\.advanced-row-desc\s*\{/,
-    '★ .advanced-row-desc 样式必须存在（说明行不能是裸文本）');
+  for (const fieldId of ['buildTestCommand', 'buildCommand', 'buildArtifacts']) {
+    assert.match(buildPanel, new RegExp(`<label class="pipeline-field-label" for="${fieldId}">[^<]+</label>`),
+      `★ ${fieldId} 必须有对应的可见字段标签`);
+  }
+  assert.match(cssCode, /\.pipeline-stage-desc\s*\{/,
+    '★ .pipeline-stage-desc 样式必须存在（阶段说明不能是裸文本）');
+  assert.match(cssCode, /\.pipeline-field-label\s*\{/,
+    '★ .pipeline-field-label 样式必须存在（字段上下文不能丢失）');
 
   /* 构建报告：空态整块隐藏，而不是留一行"完成验证后…"的占位。
    * ★ 按**属性语义**断言（与本文件 ④ 里 clearTaskState 同一条教训）：

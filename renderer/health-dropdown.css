@@ -106,7 +106,7 @@ html, body {
   font-size: 15px;
   font-weight: 650;
   color: var(--text-main);
-  letter-spacing: -0.01em;
+  letter-spacing: normal;
 }
 
 .header-right {
@@ -214,7 +214,7 @@ html, body {
   color: var(--text-main);
   white-space: nowrap;
   flex-shrink: 0;
-  letter-spacing: -0.01em;
+  letter-spacing: normal;
 }
 
 /* 状态标签：强制单行，绝对不折行！ */

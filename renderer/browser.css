@@ -13,6 +13,8 @@
   --track:#dfe2e5;--sunken:#f5f5f5;--sunken-text:#74777c;
   --dot:#b8bcc2;
   --accent-soft-bg:#f1f5f9;--accent-soft-text:#1f2937;
+  --blue:#2563eb;--bg:#ffffff;--drawer-card-bg:#ffffff;
+  --sidebar-default-width:420px;--current-sidebar-width:420px;
   /* 页面底色。第 42 轮：从写死在 html,body 上的字面量收敛成令牌 ——
    * 深色主题改一行即可，不必去两条规则里各改一遍（改漏一处就是"只有一半变深"）。 */
   --page-bg:#ffffff;
@@ -701,11 +703,6 @@ button *,
    右侧抽屉式侧边栏 (Right Drawer Sidebar)
    彻底杜绝 WebContentsView 遮挡，为技能与快捷指令提供完整工作面板
    ────────────────────────────────────────────────────────────────────────── */
-:root {
-  --sidebar-default-width: 420px;
-  --current-sidebar-width: 420px;
-}
-
 .right-drawer-sidebar {
   position: fixed;
   top: var(--toolbar-height);
@@ -977,7 +974,7 @@ body.sidebar-resizing * {
   padding: 15px 16px;
   border-radius: 12px;
   border: 1px solid var(--border);
-  background: var(--surface, #ffffff);
+  background: var(--drawer-card-bg);
   cursor: pointer;
   transition: transform .2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow .2s cubic-bezier(0.16, 1, 0.3, 1), border-color .2s ease, background-color .2s ease;
   user-select: none;
@@ -1047,7 +1044,7 @@ body.sidebar-resizing * {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  letter-spacing: -0.01em;
+  letter-spacing: normal;
 }
 
 .drawer-card-badge {

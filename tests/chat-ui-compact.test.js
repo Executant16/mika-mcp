@@ -491,77 +491,41 @@ test('theme switching writes data-theme to both <html> and <body>, so :root toke
   }
 });
 
-test('the three overview flow icons occupy the same visual box, so none reads as smaller', () => {
-  /* 第 28 轮：这条守的是"图标留白"这类**无报错、纯视觉**的缺陷。
-   *
-   * 症状：用户指出「运行总览里'本地工具'图标比旁边两个小一些」。
-   * 实测确认不是错觉 —— 三个 .node span svg 的 CSS 尺寸**完全相同**（都是 23×23），
-   * 但立方体路径 x 只占 5..19（14 单位），而文件夹与地球占 3..21（18 单位），
-   * 于是立方体的**可见宽度只有 13.4px，比旁边的 17.2px 小 22%**。
-   *
-   * 为什么值得用测试守：CSS 尺寸相同、代码看起来完全正确、没有任何报错，
-   * 但它**肉眼可辨**，会被直接描述成"感觉没做好"。静态检查发现不了它。
-   *
-   * 为什么**只守这一组**（而不是全站所有内联图标）：
-   * 这条测试的第一版对全站图标套用"横向 ≥60%"的阈值，结果一次报出 10 个
-   * —— 但其中绝大多数是**正当**的：导航图标里有水平线条（`M8.5 6h12`，
-   * 天然只占横向一部分）、列表箭头（`m9 5 7 7-7 7`，就是个窄箭头）。
-   * 对它们要求"画满画布"是错的。
-   * 真正的契约只存在于**这一组必须并排比较的三个图标**之间：
-   * 它们被放在同样大小的方框里横向并列，所以只要有一图形留白更多，
-   * 就会立刻显出大小差异。这才是有意义的断言范围。
-   *
-   * 判据改用**具体路径坐标**而不是通用解析：
-   * 与其写一个不可靠的 SVG 解析器（H/V 指令是单值、A 指令前 5 个参数不是坐标，
-   * 按"两两成对"取会错位 —— 第一版就栽在这里），
-   * 不如直接锁住这三个图标的已知形状：都要触达 x≈3 与 x≈21。 */
-  /* ★ 界面重写把首页的三节点流程图（.connection-visual）换成了「当前状态」
-   * 三行列表，隐藏兼容桩里已经没有图标可量。原意图一字未改：
-   * **三个并排的视觉单元必须一样大，不能有一个看起来偏小**。
-   * 在新结构上，等价的成立条件是三件事：
-   *   ① 恰好三行可见状态项，且三行的内部结构逐项相同
-   *      （标签列 / 值列 / 徽标列 + 圆点 + 箭头）；
-   *   ② 三行共用一条尺寸规则，没有任何"按行号单独覆盖尺寸"的规则；
-   *   ③ 三行里的箭头图标逐字相同 —— 路径没画满画布才会"看起来小一些"，
-   *      而三处的 CSS 尺寸完全相同、从代码上看不出原因（与旧立方体同一条教训）。 */
+test('the three overview status summaries share the same visual weight', () => {
+  /* 首页已从流程图改成横向状态摘要。原有视觉契约仍保留：工作目录、本地
+   * MCP、ChatGPT 三项必须同时出现，内部结构一致，并共享圆点与布局尺寸，
+   * 避免某一项因缺少状态锚点而显得更弱。 */
   const html = read('renderer/index.html');
   const css = read('renderer/styles.css');
 
-  const listStart = html.indexOf('class="overview-status-list"');
-  assert.ok(listStart > 0, '应能找到运行总览的「当前状态」列表');
-  const list = html.slice(listStart, html.indexOf('</section>', listStart));
-  const rows = list.split(/(?=<div class="overview-status-item)/)
-    .filter((chunk) => chunk.startsWith('<div class="overview-status-item'));
-  assert.equal(rows.length, 3, `「当前状态」应恰好三行可见状态项，实际 ${rows.length} 行`);
+  const listStart = html.indexOf('class="overview-status-summary-list"');
+  assert.ok(listStart > 0, '应能找到运行总览的「当前状态」摘要列表');
+  const listEnd = html.indexOf('</section>', listStart);
+  const list = html.slice(listStart, listEnd > listStart ? listEnd : html.length);
+  const rows = list.split(/(?=<div class="overview-status-summary-item)/)
+    .filter((chunk) => chunk.startsWith('<div class="overview-status-summary-item'));
+  assert.equal(rows.length, 3, `「当前状态」应恰好三个摘要项，实际 ${rows.length} 项`);
 
-  const labels = ['本地服务', 'ChatGPT', '工作文件夹'];
-  const shapeOf = (row) => ['status-col-label', 'status-col-value', 'status-col-badge', 'status-dot-sm', 'status-arrow-icon']
-    .map((cls) => (row.match(new RegExp(`class="${cls}`, 'g')) || []).length).join('/');
-  assert.deepEqual(rows.map(shapeOf), ['1/1/1/1/1', '1/1/1/1/1', '1/1/1/1/1'],
-    `三行状态项的内部结构必须逐项相同 —— 缺一列的那一行会读起来"更小/更弱"：`
-    + rows.map(shapeOf).join(' | '));
-  labels.forEach((label, i) => {
-    assert.ok(rows[i].includes(`>${label}</span>`), `第 ${i + 1} 行应是「${label}」`);
-  });
+  assert.deepEqual(rows.map((row) => (row.match(/id="([^"]+)"/) || [])[1]),
+    ['summaryItemWorkspace', 'summaryItemMcp', 'summaryItemTunnel'],
+    '工作目录、本地 MCP、ChatGPT 三项应保持稳定顺序');
+  assert.deepEqual(rows.map((row) => ['status-summary-dot', 'status-summary-label', 'status-summary-val']
+    .map((cls) => (row.match(new RegExp(`class="${cls}`, 'g')) || []).length).join('/')),
+  ['1/1/1', '1/1/1', '1/1/1'],
+  '三个摘要项必须共享圆点、标签和值三段结构');
+  for (const label of ['工作目录', '本地 MCP', 'ChatGPT']) {
+    assert.match(list, new RegExp(`>${label}<\\/span>`), `摘要中应保留「${label}」`);
+  }
 
-  /* ③ 箭头图标逐字相同（路径快照式判据，不需要解析几何）。 */
-  const arrows = rows.map((row) => row.match(/<svg class="status-arrow-icon"[\s\S]*?<\/svg>/)?.[0] || '');
-  assert.ok(arrows.every(Boolean), '三行状态项都要有箭头图标');
-  assert.equal(new Set(arrows).size, 1,
-    '三行的箭头图标必须逐字相同 —— 有一个路径没画满画布就会"看起来小一些"，而 CSS 尺寸完全相同');
-  assert.match(arrows[0], /viewBox="0 0 16 16"/, '箭头画布应统一为 16×16');
-  assert.match(arrows[0], /d="M6 12l4-4-4-4"/,
-    '箭头应画满画布（x 6..10 居中占满）而不是缩在一角');
-
-  /* ② CSS：三行共用一条尺寸规则，且没有按行号单独覆盖尺寸。 */
-  const itemRules = [...css.matchAll(/^\.overview-status-item\s*\{([^}]*)\}/gm)].map((m) => m[1]);
-  assert.equal(itemRules.length, 1, '.overview-status-item 的完整外观应只有一处定义');
-  assert.match(itemRules[0], /grid-template-columns:\s*\d+px minmax\(0,\s*1fr\) auto/,
-    '三行必须共用同一条列模板（标签列定宽 + 值列伸缩 + 徽标列自适应）');
-  assert.doesNotMatch(css, /\.overview-status-item:nth-child\([^)]*\)\s*\{[^}]*(?:min-height|padding|font-size|grid-template-columns)/,
-    '不得为某一行单独覆盖尺寸 —— 那正是"其中一行看起来偏小"的机制');
-  assert.doesNotMatch(css, /\.overview-status-item[^{]*\.status-dot-sm[^{]*\{[^}]*(?:width|height):\s*\d/,
-    '不得为某一行单独覆盖状态圆点尺寸');
+  const itemRules = [...css.matchAll(/\.overview-status-summary-item\s*\{([^}]*)\}/gm)].map((m) => m[1]);
+  assert.ok(itemRules.length >= 1, '.overview-status-summary-item 应有统一的布局规则');
+  assert.match(itemRules.at(-1), /display:\s*inline-flex/,
+    '摘要项应使用统一的内联布局，避免某一项被单独撑大');
+  const dotRule = css.match(/\.status-summary-dot\s*\{([^}]*)\}/m)?.[1] || '';
+  assert.match(dotRule, /width:\s*7px/, '摘要状态点应统一为 7px');
+  assert.match(dotRule, /height:\s*7px/, '摘要状态点应统一为 7px');
+  assert.doesNotMatch(css, /\.overview-status-summary-item:nth-child\([^)]*\)\s*\{[^}]*(?:width|height|font-size|gap)/,
+    '不得为某一摘要项单独覆盖尺寸 —— 那正是视觉权重不一致的机制');
 });
 
 test('state-changing save buttons live in the page header, not at the page bottom', () => {
@@ -682,9 +646,10 @@ test('only one text "刷新" button remains; panel-level reloads are small icon 
   assert.equal(unexpected.length, 0,
     `除顶栏全局刷新外，不应再有带文字的「刷新」按钮；发现 ${unexpected.join(', ')}`);
 
-  /* 2) 四个面板级刷新必须是 .panel-icon-button，且不再用 secondary/primary 样式。
-   *    第 28 轮把 #refreshTaskState 也收进这一档（原来它是 primary-button 的文字「刷新」）。 */
-  for (const id of ['refreshWorkspaceContext', 'refreshCodingToolsGuide', 'refreshLogs', 'refreshTaskState']) {
+   /* 2) 当前可见的三个面板级刷新必须是 .panel-icon-button，且不再用
+    *    secondary/primary 样式。任务页入口已收进首页，#refreshTaskState 只作为
+    *    隐藏兼容节点保留，不能把它当成当前界面的可见按钮。 */
+  for (const id of ['refreshWorkspaceContext', 'refreshCodingToolsGuide', 'refreshLogs']) {
     assert.match(html, new RegExp(`class="panel-icon-button[^"]*" id="${id}"`),
       `${id} 应为小图标按钮（.panel-icon-button）`);
     assert.doesNotMatch(html, new RegExp(`class="(?:secondary|primary)-button[^"]*" id="${id}"`),
@@ -840,7 +805,7 @@ test('sidebar keeps a single readiness line instead of duplicating overview stat
   assert.match(html, /id="sideRuntimeText"/);
 });
 
-test('the sidebar is grouped, and the guide sits alone at the bottom', () => {
+test('the sidebar uses flat navigation, and the guide sits in the bottom help area', () => {
   /* 第 30 轮用户原话：
    *   「设置的侧边任务栏UI需要优化，日常、配置和维护需要重新设计，
    *     接入指南建议放到最下面单独列出；最下面的"状态检查在本机完成，
@@ -863,19 +828,15 @@ test('the sidebar is grouped, and the guide sits alone at the bottom', () => {
   const htmlCode = html.replace(/<!--[\s\S]*?-->/g, '');
   const cssCode = css.replace(/\/\*[\s\S]*?\*\//g, '');
 
-  /* ① 分组标签按「日常 / 设置 / 扩展 / 帮助」的次序出现，且都在导航容器内。
-   *    原意图（"分组按用户此刻要做什么重划，且标签必须真的在导航容器内"）
-   *    没变，只是重划后的组名从「日常/配置/维护/帮助/高级」变成了
-   *    「日常（总览·任务）/ 设置（连接与文件·偏好设置）/ 扩展（技能·提示词·记忆）
-   *      / 帮助（故障排查·关于我们，吸底）」—— 「高级」不再是独立组，
-   *    它的入口现在是隐藏兼容节点（见布局归属清单）。 */
+  /* ① 当前导航采用扁平的日常入口列表，只有帮助区单独吸底；旧版的
+   *    nav-group-label 分组标题已经从界面移除。这里守住真实入口顺序，
+   *    避免把隐藏兼容节点重新当成用户可见分组。 */
   const navStart = htmlCode.indexOf('<nav class="nav-list"');
   const navEnd = htmlCode.indexOf('</nav>', navStart);
   assert.ok(navStart > -1 && navEnd > navStart, '侧栏应有 .nav-list 导航容器');
   const nav = htmlCode.slice(navStart, navEnd);
-  const groupOrder = [...nav.matchAll(/<span class="nav-group-label"[^>]*>([^<]+)<\/span>/g)].map((m) => m[1]);
-  assert.deepEqual(groupOrder, ['日常', '设置', '扩展', '帮助', '开始使用'],
-    '分组标签应包含「日常 / 设置 / 扩展 / 帮助 / 开始使用」五项且保持此顺序');
+  assert.doesNotMatch(nav, /nav-group-label/,
+    '当前扁平导航不应再渲染旧版分组标题');
 
   /* ② 可见导航项的次序必须稳定。
    *    ★ 判据取"不带 hidden 的项"而不是"文件里搜得到 data-page" ——
@@ -885,8 +846,8 @@ test('the sidebar is grouped, and the guide sits alone at the bottom', () => {
   const visibleItems = [...nav.matchAll(/<button class="nav-item(?: active)?" data-page="([a-z]+)"(?![^>]*\bhidden\b)/g)]
     .map((m) => m[1]);
   assert.deepEqual(visibleItems.filter((p) => p !== 'guide'),
-    ['overview', 'task', 'deploy', 'settings', 'skills', 'prompts', 'memory', 'health', 'about'],
-    '可见导航项的次序应稳定（日常：总览/任务 → 设置：连接与文件/偏好设置 → 扩展：技能/提示词/记忆 → 吸底帮助：故障排查/关于我们）');
+    ['overview', 'skills', 'prompts', 'memory', 'settings', 'health', 'about'],
+    '可见导航项的次序应稳定（总览 → 技能/提示词/记忆 → 设置 → 吸底帮助）');
   /* ★ 这条「接入指南须有可见入口」的断言**保留为"可见入口"断言**。
    *   第 30 轮记录的决定是「接入指南从配置组移出，放到侧栏最下面单独成区」。
    *   界面重写中间态一度把它写成了一个**隐藏空按钮**（隐藏的空按钮不是入口：
@@ -947,27 +908,9 @@ test('the sidebar is grouped, and the guide sits alone at the bottom', () => {
   assert.match(bottomRules[0], /border-top:\s*1px solid var\(--border\)/,
     '底部区要有分隔线，才能和上面三组"分开"');
 
-  /* ⑥ 分组标签必须是"弱化的层级标记"，不能和导航项同色同权 ——
-   *    改前两者都是 --muted，读起来标签就像第 4 个按钮。
-   *    ★ 原判据断言"只有一处定义"。现界面在紧凑层里又写了一份（后写者胜），
-   *      两处并不冲突（都是 --muted-2），但重复选择器本身是"两处真相"的气味，
-   *      已列入需要代码侧处理的清单。这里把判据改成**语义判据**：
-   *      每一处定义都必须用更弱的 --muted-2，且胜出的那一处必须
-   *      与 .nav-item 的 --muted 拉开层级。 */
-  const labelRules = [...cssCode.matchAll(/^\.nav-group-label\{([^}]*)\}/gm)].map((m) => m[1]);
-  assert.ok(labelRules.length >= 1, '.nav-group-label 应至少有一处定义');
-  for (const rule of labelRules) {
-    assert.match(rule, /color:\s*var\(--muted-2\)/,
-      `每一处 .nav-group-label 都必须用更弱的 --muted-2：${rule.trim()}`);
-  }
-  const labelRule = labelRules[labelRules.length - 1]; // 同特异性下后写者胜
-  assert.match(labelRule, /padding-top:/,
-    '组间距离靠 padding-top，否则三组会挤成一坨');
-  const navItemRule = cssCode.match(/^\.nav-item\{([^}]*)\}/m)?.[1] || '';
-  const labelColor = labelRule.match(/color:\s*([^;]+)/)?.[1].trim();
-  const itemColor = navItemRule.match(/color:\s*([^;]+)/)?.[1].trim();
-  assert.ok(labelColor && itemColor && labelColor !== itemColor,
-    `分组标签必须比导航项更弱（同色会把标签读成第 4 个按钮）：标签 ${labelColor} vs 导航项 ${itemColor}`);
+  /* ⑥ 旧分组标题既然不再是界面元素，不能用死 CSS 规则冒充可见层级。 */
+  assert.doesNotMatch(htmlCode, /class="nav-group-label"/,
+    '旧版分组标题不应以隐藏或空节点形式回到 DOM');
 });
 
 test('styles.css consumes scale tokens instead of scale literals', () => {
@@ -1330,8 +1273,9 @@ test('the brand mark is not squeezed by unrelated class-name collisions', () => 
   assert.match(css, /\.primary-button\.large,\s*\.secondary-button\.large,\s*\.danger-button\.large\{/,
     '按钮的放大变体规则应保留并限定前缀');
 
-  // 徽标尺寸四处同源：三处 svg 的几何必须一致（详见 tests/icon-source.test.js 的真源比对）
-  assert.equal((html.match(/class="brand-mark/g) || []).length, 2);
+  // 当前关于页使用 mascot.jpg，内联 SVG 徽标只保留侧栏一处，启动遮罩另有 boot-logo。
+  // 几何同源仍由 tests/icon-source.test.js 对实际存在的两处 SVG 做真源比对。
+  assert.equal((html.match(/class="brand-mark/g) || []).length, 1);
   assert.equal((html.match(/class="boot-logo"/g) || []).length, 1);
 });
 
@@ -1463,10 +1407,12 @@ test('the global refresh and start buttons appear only on the pages that own the
   }
   /* ★ 现判据表里没有任何页面拥有「启动服务」→ #topStartButton 恒定 hidden。
    *   原意图「收起不等于砍掉能力」在这里必须用**替代入口**来兑现：
-   *   启动服务的可见入口必须仍在首页（#overviewHeroActionBtn）。 */
+   *   启动服务的可见入口必须仍在首页（#overviewHeroActionBtn）。按钮文案由
+   *   当前快照动态决定，不能把初始的「选择工作目录」误当成能力缺失。 */
   if (pages.every((p) => !rows[p].start)) {
-    assert.match(html, /id="overviewHeroActionBtn"[^>]*>启动服务</,
-      '顶栏「启动服务」在所有页面收起后，启动入口必须仍在首页可见 —— 能力不能随按钮一起消失');
+    assert.match(html, /id="overviewHeroActionBtn"/, '首页必须保留主操作入口');
+    assert.match(code, /action === 'start'\)\s*\{\s*runRuntime\('start'\)/,
+      '首页主操作在 start 分支必须仍能启动服务 —— 文案可随工作区状态变化');
   }
 
   // ② 判据表必须被执行
@@ -2305,10 +2251,9 @@ test('the guide masks the tunnel id and never trusts a self-declared confirmatio
   }
 });
 
-test('the health page groups by troubleshooting order, spreads passes out, and speaks plain Chinese', () => {
+test('the health page groups by troubleshooting order, keeps passes in a compact drawer, and speaks plain Chinese', () => {
   /* 第 29 轮（用户第 7 条）原话拆开是三句，加上一句"整个界面都要优化"：
-   *   「"已通过的检查"不要折叠」            → 不折叠
-   *   「还有不要这么设置…不要浪费大量空间」  → 但也不能铺成 10 个 58px 大行
+   *   「还有不要这么设置…不要浪费大量空间」  → 通过项收在紧凑抽屉里，避免铺成 10 个 58px 大行
    *   「里面的便携 python 是什么？」          → 术语去黑话
    *   「两个 Tunnel 相关的还没有放在一起」    → 分组
    *   「底下的安全边界一股 AI 味」            → 免责长句重做
@@ -2323,17 +2268,21 @@ test('the health page groups by troubleshooting order, spreads passes out, and s
   const css = read('renderer/styles.css');
   const service = read('electron/services/healthService.js');
 
-  /* ① 不折叠，但也不铺成大行。
-   *    必须**同时**断言两件事 —— 只断言"没有 details"会放过
-   *    "reuse .health-item 平铺"这种省空间的反向错误（10 项 × 58px = 580px，
-   *    那正是用户说的"浪费大量空间"）。 */
+  /* ① 默认收起，但也不铺成大行。
+   *    必须同时断言折叠入口和 32px 紧凑行，避免只靠 hidden 把功能变成死桩，
+   *    或把正常检查重新铺成 10 个 58px 大行。 */
   const htmlCode = html.replace(/<!--[\s\S]*?-->/g, '');
   assert.doesNotMatch(htmlCode, /health-fold|healthPassedFold/,
-    'index.html 不应再有"已通过的检查"折叠块');
-  assert.match(htmlCode, /<section class="health-passed" id="healthPassedBlock">/,
-    '通过项应直接铺开（health-passed 区），不再折叠');
+    'index.html 不应再有旧版 health-fold 折叠块');
+  const passedBlockTag = htmlCode.match(/<section class="health-passed" id="healthPassedBlock"[^>]*>/)?.[0] || '';
+  assert.ok(passedBlockTag, '通过项应有 health-passed 区');
+  assert.match(passedBlockTag, /\shidden(?=[\s>])/, '通过项默认收起，避免正常检查占据整页');
+  assert.match(htmlCode, /id="healthPassedToggleRow"/, '通过项应有可见的展开行');
+  assert.match(htmlCode, /id="togglePassedRow"/, '通过项展开行应有明确操作按钮');
+  assert.match(js, /const togglePassedDrawer = \(\) =>/, '通过项抽屉应由专门的切换函数控制');
+  assert.match(js, /block\.hidden = nextHidden;/, '展开操作必须真实切换通过项区块');
   assert.match(css, /\.health-line\s*\{[^}]*min-height:\s*32px/,
-    '通过项必须走 32px 紧凑行 —— 省空间靠"行变紧"，不靠"折叠"');
+    '通过项展开后必须走 32px 紧凑行 —— 省空间靠"行变紧"并配合抽屉');
   /* ★ 剥注释后再断言 —— 删除处那段说明逐字写着 ".health-fold（<details> 折叠）"。
    *   本条测试是本项目第 9 次遇到这个坑的现场（同一测试里两处）。 */
   assert.doesNotMatch(css.replace(/\/\*[\s\S]*?\*\//g, ''), /\.health-fold/,
@@ -2357,10 +2306,10 @@ test('the health page groups by troubleshooting order, spreads passes out, and s
     `4 个 Tunnel 相关检查项必须同组（改前 tunnel-client 与 tunnel 之间隔着 3 个 MCP 项），实际分组：${[...tunnelGroups]}`);
   /* 前端读后端给的分组，且必须处理"后端加了 check 但忘了写 group"的情况 ——
    * 静默丢失会让"10 项检查"在界面上变成 8 项，且用户无从察觉。 */
-  assert.match(js, /const GROUP_DEFS = Array\.isArray\(report\.groups\) && report\.groups\.length/,
-    'renderHealth 应读后端返回的 groups');
-  assert.match(js, /const orphans = checks\.filter\(\(item\) => !claimed\.has\(item\.id\)\);/,
-    '未被任何分组认领的检查必须有兜底渲染，不得静默丢失');
+  assert.match(js, /const checks = orderHealthChecks\(report\);/,
+    'renderHealth 应按后端分组排序当前列表，不恢复旧的分组面板');
+  assert.match(js, /const orphans = checks\.filter\(\(item\) => !claimed\.has\(item\)\);/,
+    '未被任何分组认领的检查必须保留；排序行为另由 health-check-order.test.js 验证');
 
   /* ③ 术语去黑话。"便携 Python"是 portable 的直译，用户明确问"这是什么"。
    * ★ 这里必须先剥注释。我在改动处写的说明注释里逐字引用了旧术语
@@ -2378,12 +2327,10 @@ test('the health page groups by troubleshooting order, spreads passes out, and s
    *    这份报告可能被截图/复制出去发给别人排查 —— 与接入指南同等敏感。 */
   assert.match(service, /function maskSecretId\(value\) \{/,
     'healthService 应有自己的脱敏函数（主进程侧，不依赖 renderer）');
-  assert.match(service, /detail: current\.tunnelId \? `\$\{maskSecretId\(current\.tunnelId\)\}（已填写）`/,
+  assert.match(service, /detail: tunnelId \? `\$\{maskSecretId\(tunnelId\)\}（已加密保存）`/,
     '体检报告里的 Tunnel ID 必须是脱敏值');
-  /* ★ 锚点唯一性自检：`detail: current.tunnelId` 这种前缀可能被别处命中，
-   *   所以上一行断言带上了 maskSecretId —— 它全文件只出现 1 次。 */
-  assert.equal((service.match(/maskSecretId\(current\.tunnelId\)/g) || []).length, 1,
-    'maskSecretId(current.tunnelId) 应恰好出现一次（唯一锚点）');
+  assert.equal((service.match(/maskSecretId\(tunnelId\)/g) || []).length, 1,
+    '体检报告应恰好调用一次 Tunnel ID 脱敏函数');
 
   /* ⑤ 彻底移除无用的免责边界卡片（用户要求删掉纯噪音内容，遵守 DESIGN.md 删元素同时删死样式规则） */
   assert.doesNotMatch(htmlCode, /class="health-scope"/,
@@ -2709,8 +2656,8 @@ test('the task page hands its archived build report to the shared renderer, guar
   const vm = require('node:vm');
   const html = read('renderer/index.html');
   assert.match(html, /id="buildReportSource"/, '需要一块专门显示报告来源的位置');
-  assert.match(app, /来自任务执行时自动记录/);
-  assert.match(app, /来自你手动执行的验证/);
+  assert.match(app, /任务自动记录/);
+  assert.match(app, /手动执行/);
   assert.match(app, /source === 'task'/, '来源文案必须按 source 分支，不能用同一句话糊过去');
   void vm;
 });
@@ -2973,7 +2920,7 @@ test('the task page panels and history rows carry the exact wiring the round-28 
     '#taskStateContent 里不应再有第二份构建报告 —— 重复 id 会让第二份永远不更新');
 });
 
-test('the task page stays light when idle, keeps its history panel, and never eats its own text', () => {
+test('the task activity stays light when idle, preserves history compatibility wiring, and never eats its own text', () => {
   /* 第 30 轮用户原话，一句话里三个独立问题：
    *   「任务状态页面一言难尽，UI过于简陋，历史清除了怎么整个部分都没有了，
    *     还有在不同比例下UI会发生严重形变」
@@ -3036,20 +2983,17 @@ test('the task page stays light when idle, keeps its history panel, and never ea
   assert.doesNotMatch(cssCode, /\.task-empty-grid/,
     '★ 三张预告卡的样式必须一同删除，不留死 CSS');
 
-  /* 轻量状态提示：工具栏上的一个胶囊。它必须真的带状态点（i），
-   * 不是一个纯文字标签 —— 圆点是"余光可读"的实现。 */
-  assert.match(htmlCode, /class="status-pill[^"]*" id="taskIdleChip"/,
-    '★ 空闲态应改为工具栏上的状态胶囊（用户第 2 条：「改用轻量级状态提示」）');
-  assert.match(cssCode, /\.status-pill i\{/,
-    '★ 状态胶囊要有圆点标记 —— 纯文字标签在余光里读不出"就绪"这个状态');
-  assert.match(appCode, /if \(idleChip\) \{\s*\n\s*idleChip\.hidden = hasTask;/,
-    '★ 有任务时胶囊必须让位给真实的进度视图，不能同时显示两种状态');
-
-  /* 空闲态不得放任何"去创建任务"类按钮 —— 这一页没有创建任务的入口。
-   * （「清除任务状态」是页头工具，不在此列；它的显隐由 ④ 守。） */
-  const idleChipTag = htmlCode.match(/<span class="status-pill" id="taskIdleChip"[\s\S]{0,200}?<\/span>\s*<\/span>/)?.[0] || '';
-  assert.doesNotMatch(idleChipTag, /<button/,
-    '★ 空闲胶囊里不应放按钮');
+  /* 轻量状态提示现在落在首页的「任务活动」卡片，空闲态和运行态二选一。
+   * 隐藏兼容节点里的 #taskIdleChip 不属于用户界面，不能拿它充当功能证据。 */
+  assert.match(htmlCode, /id="taskActivityIdleState"/, '首页应有轻量任务空闲态');
+  assert.match(htmlCode, /class="task-idle-desc"/, '空闲态应说明如何触发本地任务');
+  assert.match(htmlCode, /id="taskActivityRunningState"/, '首页应有任务运行态');
+  assert.match(appCode, /function renderUnifiedTaskActivity\(\)/,
+    '任务活动应由统一渲染函数控制');
+  assert.match(appCode, /idleState\.hidden = true;[\s\S]*?runningState\.hidden = false;/,
+    '有任务时必须隐藏空闲态并显示运行态');
+  assert.match(appCode, /runningState\.hidden = true;[\s\S]*?idleState\.hidden = false;/,
+    '无任务时必须隐藏运行态并显示空闲态');
 
   /* ── ② 历史面板必须常驻，不许"空了就整块消失" ─────────────────────── */
   assert.match(appCode, /panel\.hidden = false;/,
@@ -3082,11 +3026,14 @@ test('the task page stays light when idle, keeps its history panel, and never ea
   assert.match(appCode, /task-clean-empty-desc">\$\{HISTORY_EMPTY_TEXT\}<\/p>/,
     '★ 空态渲染器必须直接引用常量 —— 渲染处另写一份字面量，'
     + '那段常量就是"定义了没人用"的死代码，两条路径会各说各话');
-  /* 初始标记里那份占位也要是同一句，否则首帧会闪一下旧文案 */
-  assert.ok(htmlCode.includes(emptyText),
-    '初始标记的历史占位应与运行期文案逐字一致（否则首帧会闪一下旧文案）');
-  assert.doesNotMatch(htmlCode, /id="taskHistoryPanel"[^>]*\shidden/,
-    '★ #taskHistoryPanel 不应在标记里带 hidden —— 面板常驻，显隐由 JS 统一管');
+  /* 任务历史节点目前属于隐藏兼容区，首页用户看到的是上方任务活动卡片；
+   * 因此不再要求不可见首帧写入历史文案，而是守住兼容区不会意外暴露。 */
+  const historyPanelIndex = htmlCode.indexOf('id="taskHistoryPanel"');
+  assert.ok(historyPanelIndex >= 0, '任务历史兼容节点仍应保留事件接线');
+  const historyCompatStart = htmlCode.lastIndexOf('<div hidden', historyPanelIndex);
+  const historyCompat = htmlCode.slice(historyCompatStart, historyPanelIndex + 80);
+  assert.ok(historyCompatStart >= 0, '任务历史节点应位于隐藏兼容容器内');
+  assert.match(historyCompat, /aria-hidden="true"/, '隐藏任务历史兼容区必须对用户与读屏隐藏');
 
   /* ── ③ 值列表不再静默吃字 ───────────────────────────────────────── */
   /* 同上：不锚行首 —— 这条规则也在压缩行里。

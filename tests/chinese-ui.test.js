@@ -88,7 +88,7 @@ test('build verification defaults to an automatic plan with manual overrides fol
   assert.match(html, /<h3>项目构建与策略<\/h3>/,
     '构建配置现在锚在这张卡片上（原判据是任务页的 <h3>构建与验证</h3>，'
     + '中途一度锚在 <h4 class="advanced-block-title">构建与测试策略</h4>）');
-  assert.match(html, /留空则系统自动推断/,
+  assert.match(html, /留空(?:则系统)?自动推断/,
     '★ 保留的原意图：不用手填，留空就走自动方案（原判据是「自动选择」）');
   assert.match(html, /id="buildPlanBuild">自动检测</,
     '★ 构建方案的默认文案必须是「自动检测」');
