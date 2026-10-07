@@ -17,7 +17,8 @@
     "verify": "npm test && npm run check:css-ratchet && npm run check:contrast",
     "audit:prod": "npm audit --omit=dev",
     "dist": "npm run icon:build && npm test && electron-builder --win nsis && node scripts/touch-dist-timestamps.js",
-    "dist:dir": "npm run icon:build && electron-builder --dir && node scripts/touch-dist-timestamps.js"
+    "dist:dir": "npm run icon:build && electron-builder --dir && node scripts/touch-dist-timestamps.js",
+    "release": "npm run icon:build && electron-builder --win nsis --publish=always && node scripts/touch-dist-timestamps.js"
   },
   "dependencies": {
     "electron-updater": "^6.8.9"
@@ -32,7 +33,11 @@
     "appId": "com.executant.mika-mcp",
     "productName": "Mika MCP",
     "copyright": "Copyright © 2026 Executant Studio",
-    "publish": null,
+    "publish": {
+      "provider": "github",
+      "owner": "Executant16",
+      "repo": "mika-mcp"
+    },
     "artifactName": "mika-mcp-setup-${version}.${ext}",
     "directories": {
       "output": "dist"

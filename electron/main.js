@@ -10,6 +10,7 @@ const fs = require('node:fs/promises');
 const fsSync = require('node:fs');
 const crypto = require('node:crypto');
 const { app, BrowserWindow, WebContentsView, dialog, ipcMain, shell, Tray, Menu, nativeImage, session, Notification, nativeTheme, clipboard } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const { SettingsStore } = require('./services/settingsStore');
 const { SkillStore } = require('./services/skillStore');
 const { PromptStore } = require('./services/promptStore');
@@ -448,6 +449,83 @@ function showChatWindow() {
   return target;
 }
 
+// ---- 自动更新（electron-updater）----
+// 运行时只从公开 Release 拉取更新，公开仓库免鉴权；GH_TOKEN 仅用于本机发布 Release。
+let updaterWired = false;
+let updaterBusy = false;
+
+function wireUpdaterEvents() {
+  if (updaterWired) return;
+  updaterWired = true;
+  autoUpdater.autoDownload = true;
+  autoUpdater.on('checking-for-update', () => {
+    sendManager('app:update-status', { status: 'checking' });
+  });
+  autoUpdater.on('update-available', (info) => {
+    updaterBusy = true;
+    sendManager('app:update-status', { status: 'available', version: info && info.version });
+  });
+  autoUpdater.on('update-not-available', (info) => {
+    updaterBusy = false;
+    sendManager('app:update-status', { status: 'not-available', version: info && info.version });
+  });
+  autoUpdater.on('download-progress', (progress) => {
+    sendManager('app:update-progress', {
+      percent: progress && progress.percent,
+      transferred: progress && progress.transferred,
+      total: progress && progress.total
+    });
+  });
+  autoUpdater.on('update-downloaded', (info) => {
+    updaterBusy = false;
+    sendManager('app:update-status', { status: 'downloaded', version: info && info.version });
+    notifyUpdateDownloaded(info && info.version);
+  });
+  autoUpdater.on('error', (err) => {
+    updaterBusy = false;
+    const message = (err && (err.message || String(err))) || 'unknown';
+    sendManager('app:update-status', { status: 'error', message });
+    console.warn('>>> [Mika-MCP] 自动更新出错（已忽略）：', message);
+  });
+}
+
+function notifyUpdateDownloaded(version) {
+  try {
+    const n = new Notification({
+      title: 'Mika MCP 更新已就绪',
+      body: `新版本 ${version || ''} 已下载，点击此处重启安装`
+    });
+    n.on('click', () => { try { autoUpdater.quitAndInstall(); } catch (_) {} });
+    n.show();
+  } catch (_) { /* 通知不可用时不阻塞主流程 */ }
+}
+
+function initAutoUpdater() {
+  try {
+    wireUpdaterEvents();
+    if (app.isPackaged) {
+      autoUpdater.checkForUpdates();
+    }
+  } catch (err) {
+    console.warn('>>> [Mika-MCP] 初始化自动更新失败（已忽略）：', (err && err.message) || err);
+  }
+}
+
+function checkForUpdatesManually() {
+  if (updaterBusy) {
+    sendManager('app:update-status', { status: 'checking' });
+    return;
+  }
+  try {
+    updaterBusy = true;
+    autoUpdater.checkForUpdates();
+  } catch (err) {
+    updaterBusy = false;
+    const message = (err && (err.message || String(err))) || 'unknown';
+    sendManager('app:update-status', { status: 'error', message });
+  }
+}
+
 function createTray() {
   if (tray && !tray.isDestroyed()) return tray;
   if (settings.load().showTrayIcon === false) return null;
@@ -458,6 +536,7 @@ function createTray() {
     tray.setContextMenu(Menu.buildFromTemplate([
       { label: '打开 Mika MCP', click: () => showChatWindow() },
       { label: '打开管理设置', click: () => { showChatWindow(); openSettingsSurface('settings'); } },
+      { label: '检查更新', click: () => checkForUpdatesManually() },
       { type: 'separator' },
       { label: '退出 Mika MCP', click: () => { forceQuit = true; app.quit(); } }
     ]));
@@ -853,6 +932,7 @@ function registerIpc() {
    * 首屏版本号会一直空着，要手动 refresh 才有值。 */
   secureHandle('app:snapshot', (_event, options) => invokeSafely(() => orchestrator.snapshot(options || {})));
   secureHandle('app:lightweight-snapshot', () => invokeSafely(() => orchestrator.lightweightSnapshot()));
+  secureHandle('app:check-for-updates', () => invokeSafely(() => checkForUpdatesManually()));
   secureHandle('workspace:hub', () => invokeSafely(async () => { const current = settings.load(); return { activeWorkspace: current.workspace, recentWorkspaces: current.recentWorkspaces || [] }; }));
   secureHandle('workspace:switch', (_event, workspace) => invokeSafely(async () => {
     const result = await orchestrator.switchWorkspace(workspace);
@@ -1640,6 +1720,7 @@ if (!hasSingleInstanceLock) {
   healthService = new HealthService({ settings, secrets, environment, orchestrator });
   log.on('entry', (payload) => sendManager('logs:entry', payload));
   registerIpc();
+  initAutoUpdater();
   const startupSettings = settings.load();
 
   /* 跟随系统档下的"系统亮度实时变化"监听。
