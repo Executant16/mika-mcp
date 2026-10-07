@@ -58,6 +58,8 @@ const BASELINE = path.join(root, 'stylelint-baseline.json');
  * 真新增一条重复选择器照样能被认出来。 */
 function normalizeText(text) {
   return String(text)
+    // Windows 检出可能把多行选择器改成 CRLF，提示文本也会随之改变。
+    .replace(/\r\n?/g, '\n')
     // no-duplicate-selectors: "first used at line 15" —— 行号随无关编辑漂移
     .replace(/first used at line \d+/gi, 'first used at line ?')
     // 兜底：其他规则若把行号写进 message，同样剥掉
