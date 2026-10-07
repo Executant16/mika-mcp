@@ -1,0 +1,487 @@
+/* ============================================================================
+ * design-tokens.css —— 网页 MCP 助手 · 设计令牌层（建议稿）
+ * ----------------------------------------------------------------------------
+ * 用途：作为 renderer/ 下唯一允许定义"具体颜色 / 字号 / 圆角 / 间距"的文件。
+ *       其余 CSS 一律只引用 var(--token)，不得写死数值。
+ *
+ * 现状问题（本文件要解决的）：
+ *   - 3 个 CSS 文件里散落 153 处硬编码 hex + 82 处 rgba
+ *   - 去重后 92 个颜色值，其中大量近重复：
+ *       #080b10 与 --bg 的 #080b11 只差 1
+ *       #36d4d7 / #3cd2d9 / #40d7e8 三个几乎一样的青色（而 --cyan 已存在）
+ *   - 12 种字号（8~24px）、12 种圆角（4~999px），无尺度约束
+ *
+ * 引入方式：在 index.html 里【最先】加载，早于 styles.css
+ *   <link rel="stylesheet" href="design-tokens.css">
+ *   <link rel="stylesheet" href="styles.css">
+ * ========================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  /* ---- 表面 / 背景 ----------------------------------------------------
+   * 取值说明：以下 12 个令牌此前在 styles.css 的 :root 里被重复定义，
+   * 而 styles.css 加载在后、权重相同，因此实际生效的一直是 styles.css
+   * 的取值（本文件的值是死代码）。现已把本文件校正为渲染器实测值，
+   * 并删除 styles.css 中的重复定义 —— 渲染结果不变，但取值来源唯一。 */
+  --bg:            #141414;
+  --sidebar:       #171717;
+  --surface:       #242424;
+  --surface-2:     #2e2e2e;
+  --surface-3:     #3a3a3a;
+
+  /* 代码块 / 控制台专用（原先散落硬编码 #080b10、#0b0e14、#f4f7fb） */
+  --console-bg:    #0b0e14;
+  --console-text:  #c9d2df;
+
+  /* ---- 文字 ------------------------------------------------------------ */
+  --text:          #f2f2f2;
+  --muted:         #a6a6a6;
+  /* 原 #7a7a7a 在 --surface-2 上仅 3.62:1（正文需 4.5:1）。
+   * 提到 60% 明度后各级背景实测：
+   *   bg 6.47 / sidebar 6.29 / surface 5.45 / surface-2 4.77 / surface-3 3.99。
+   * 中性灰无色相，改明度不影响与任何既有配色的色相一致。 */
+  --muted-2:       #999999;
+  --text-3:        #a3a3a3;
+
+  /* ---- 描边 ------------------------------------------------------------ */
+  --border:        rgba(255, 255, 255, .15);
+  --border-strong: rgba(255, 255, 255, .26);
+
+  /* ---- 强调色 ----------------------------------------------------------
+   * 对比度要求（本次修订新增，规则见 DESIGN.md §六.7）：
+   *   同一令牌常同时作文字色与图形色（图标 / 进度点 / 进度环），必须按
+   *   "实际渲染背景"分别验证 —— 文字用途 ≥4.5:1，图形用途 ≥3:1。
+   *   注意底色不等于纯表面：消费点里有大量同色半透明底
+   *   （rgba(108,140,255,.1) 等）与渐变端点，必须先用 alpha 合成出
+   *   真实底色再算比例，否则会高估对比度。
+   *
+   * 修订原则：只调明度，不换色相。
+   *   那些同色半透明底用的是硬编码旧色相（#6c8cff / #42d392 ...），
+   *   保持色相即可让它们继续成立，改动面收敛在本文件内。 */
+  /* 5 级表面实测 bg 5.99 / sidebar 5.83 / surface 5.05 / surface-2 4.42 / surface-3 3.70。
+   * 提到 H227 S100% L72.5% 后 → 6.34 / 6.17 / 5.34 / 4.67 / 3.91，最低档由 3.70 升到 3.91。
+   * 其中最紧的消费点是 .guide-rule-summary>span（blue 字压 rgba(blue,.11) 同色底，4.57:1）。 */
+  --blue:          #7391ff;
+  --blue-2:        #4267ee;
+  --violet:        #9c7cff;
+  --cyan:          #40d7e8;
+  --green:         #42d392;  /* 各实际背景最低 5.94:1，达标，不动 */
+  --yellow:        #f4be5b;  /* 各实际背景最低 6.70:1，达标，不动 */
+  /* 各实际背景最低 4.40:1，略低于 4.5 —— 缺口出在 .build-summary.failed
+   * （红字压 rgba(red,.08) 自染底）。提到 H354 S100% L71.75% 后该处 4.51:1。 */
+  --red:           #ff6f7c;
+
+  /* 品牌渐变（原先硬编码 #796dff / #596bff / #36d4d7） */
+  --brand-1:       #796dff;
+  --brand-2:       #596bff;
+  --brand-3:       #36d4d7;
+  --accent-bar:    #6767ff;
+  /* 第 22 轮删掉 --danger-hover（原 #e0293b）。
+   * 它唯一的消费者是设置窗口栏上的 `×` 关闭按钮 hover 态（红底白图标）。
+   * 合并后该按钮变成「← 返回主界面」—— 一次导航动作，不是危险操作，
+   * 用红色 hover 语义上就不对，改为中性的 --surface-3。
+   * 消费者没了，令牌即成孤儿，故一并移除（避免留下"看起来还在用"的死令牌）。 */
+
+  /* ---- 窗口外壳（原先散落 #dedede / #3d3d3d / #212121 / #343434） ------ */
+  --chrome-bg:     #212121;
+  --chrome-border: #343434;
+  --chrome-text:   #ececec;
+
+  /* ---- 导航选中态（原先散落 #303030 / #202123 / #ececec） -------------- */
+  --nav-active-bg:   #303030;
+  --nav-active-text: #ffffff;
+
+  /* ---- 窗口外壳与顶栏 --------------------------------------------------
+   * 原先由 settings-compact.css 的 !important 与 styles.css 内嵌层共同决定，
+   * 两处都写死字面量。此处提升为令牌，使外壳只有一处取值来源。 */
+  --chrome-divider:  #303030;
+  --topbar-bg:       rgba(33,33,33,.97);
+  --overlay-bg:      rgba(20,20,20,.72);
+
+  /* ---- 主操作按钮 ------------------------------------------------------
+   * 采用现代高质感品牌强调蓝，提供优秀可读性与通透感，杜绝生硬死黑块。
+   * 白字在其上的对比度实测 >5.1:1，WCAG AA 4.5:1 达标。 */
+  --btn-primary-bg:  #2563eb;
+  --btn-primary-fg:  #ffffff;
+
+  /* ---- 连接节点底色（原先硬编码 rgba(12,17,27,.76)）------------------- */
+  --node-bg:         rgba(12,17,27,.76);
+
+  /* ---- 主题预览卡采样色（第 29 轮新增）---------------------------------
+   * 偏好设置页的「界面主题」从原生 <select> 换成两张预览卡后，每张卡都要
+   * 画一幅**它自己所代表的那套配色**的缩略图。
+   *
+   * 为什么必须独立成令牌、且**不随主题变化**：
+   *   深色卡的缩略图在浅色主题下也必须是深色 —— 否则它就成了"当前配色"
+   *   的镜像，两张卡会长得一模一样，这个选择器也就失去意义。
+   *   用 --surface / --sidebar 会得到完全相反的结果（浅色主题下 "深色卡" 变白）。
+   *
+   * 取值来源：深色侧取 :root 的 --surface/--sidebar/--surface-3，
+   * 浅色侧取 light 块的对应值 —— 即"两套主题各自长什么样"的真实采样，
+   * 不另造新颜色。单独命名只是为了让上面那条约束可被读到。 */
+  --preview-light-bg:   #ffffff;
+  --preview-light-side: #eef1f6;
+  --preview-light-mid:  #d8dde6;
+  --preview-dark-bg:    #242424;
+  --preview-dark-side:  #171717;
+  --preview-dark-mid:   #3a3a3a;
+
+  /* ---- 阴影 / 圆角（紧凑专业风格：小圆角、锐利边界） -------------------- */
+  --shadow:        0 1px 2px rgba(0, 0, 0, .18);
+  --radius-sm:     4px;
+  --radius-md:     6px;
+  --radius-lg:     8px;
+  /* 第 41 轮恢复 --radius-xl(12px)。
+   * 第 40 轮删它的理由是"消费点为 0" —— 那是**当时**的事实：12px 只在
+   * styles.css 里以 5 处字面量存在。本轮做的是把圆角字面量全部收敛到令牌，
+   * 于是这 5 处需要一个名字，xl 这个档位就重新有了唯一且明确的消费者。
+   * 换句话说：不是"把删掉的令牌加回来"，是"字面量迁移需要一个 12px 档"。 */
+  --radius-xl:     12px;
+  /* 第 41 轮新增的数值档（5/7/9/10/13/14/15/22）。
+   *
+   * 为什么允许数值名：这几档各自只有 1~7 处消费点，且分布在互不相关的组件里，
+   * 给它们编"小卡 / 中卡 / 大卡"这类语义名会是**假语义** —— 同一档在两个组件里
+   * 服务完全不同的目的，语义名只会让人以为它们该一起改。
+   * 这与字号层的 --fs-11 / --fs-15 是同一个先例：语义名给真正成体系的档位
+   * （sm/md/lg/xl/pill），其余按数值命名，谁说谎都不说。
+   * 渲染结果与迁移前的字面量**逐像素一致**（纯改名，不改值）。 */
+  --radius-2:      2px;
+  --radius-5:      5px;
+  --radius-7:      7px;
+  --radius-9:      9px;
+  --radius-10:     10px;
+  --radius-13:     13px;
+  --radius-14:     14px;
+  --radius-15:     15px;
+  --radius-16:     16px;
+  --radius-22:     22px;
+  --radius-pill:   999px;
+
+  /* ---- 字号尺度（19 档收敛为 6 档）-------------------------------------
+   * 迁移对照（已应用，见 apply-typography-scale.py）：
+   *   8px, 9px             -> --fs-xs   (12px)
+   *   10px, 11px           -> --fs-sm   (13px)
+   *   12px, 13px, 14px     -> --fs-base (14px)
+   *   15px, 16px           -> --fs-md   (16px)
+   *   17px ~ 20px          -> --fs-lg   (20px) 图标 / 小标题
+   *   21px ~ 30px          -> --fs-xl   (24px) 页面标题
+   * ---------------------------------------------------------------------- */
+  --fs-xs:   12px;
+  --fs-sm:   13px;
+  --fs-base: 14px;
+  --fs-md:   16px;
+  --fs-lg:   20px;
+  --fs-xl:   24px;
+  /* 第 27 轮新增：预格式化输出专用字号。
+   *
+   * 这是**唯一**允许低于 12px 的字号，且只用于"机器输出"而非"给人读的正文"：
+   *   .log-output / .build-console / .task-command /
+   *   .instruction-details pre / .task-worktree-diff pre
+   * 它们是等宽日志与命令回显，长行需要在一屏内多显示几列；
+   * 改成 12px 会让日志更早折行、反而更难读。详见 DESIGN.md 第三章。
+   *
+   * 为什么必须做成令牌（而不是继续写字面量）：
+   *   这 5 处以前写成 `font: 10px/1.6 Consolas,monospace` 简写。
+   *   护栏的 declaration-property-value-allowed-list 只检查 **font-size 属性**，
+   *   `font` **简写**里的字号完全绕过检查 —— 所以它们长期未被告警。
+   *   第 27 轮给简写也加了检查（拦字面量 px、放行 var()）。
+   *   此时若仍写字面量，这 5 处会被新护栏拦下。
+   *
+   *   有两条路：加 stylelint-disable 注释，或抽成令牌。
+   *   选后者，因为：
+   *     · disable 注释把例外"藏"在 5 个地方，读代码时看不出这是有意为之；
+   *     · 令牌把例外"抬"到令牌层一处集中声明，自带说明与归属；
+   *     · 而且它让"本项目只有一档低于 12px 的字号"这个事实**可查询** ——
+   *       想知道有没有人偷偷用 9px，看这里就够了。
+   * 两个主题共用同一个值（等宽日志的字号不该随主题变化）。 */
+  --fs-pre:  10px;
+
+  /* ---- 历史档位：字号字面量收敛落地（第 40 轮新增）-----------------------
+   * 背景：styles.css 里原有 **222 处 `font-size:<n>px` 字面量**，完全绕过令牌层，
+   *       使"令牌"与"字面量"成为两处真相（stylelint 的字号白名单只放行
+   *       `var(--fs-*)`，所以这 222 处一直是护栏下的存量违规）。
+   *
+   * 本轮是**收敛**，不是重新设计，因此有一条硬约束：
+   *   **用户看到的字号一个都不能变** —— 每个原值必须原样落到一个与之完全
+   *   相等的令牌上，不许就近取整到主尺度（那会改变渲染结果）。
+   *
+   * 结果：原值共 15 档，其中 6 档正好等于上面主尺度
+   *   （12/13/14/16/20/24px → --fs-xs/sm/base/md/lg/xl），
+   * 剩余 9 档落在档与档之间，没有任何现成令牌与之相等，只能按原值新增。
+   *
+   * 命名刻意用**数值**而非 t-shirt 名（xs/sm/base…）：
+   *   这些档位不是设计出来的台阶，而是历次改版留下的历史值。用数值命名让
+   *   "它们不在 6 档主尺度上"这件事在阅读与检索时一眼可见，也便于日后合并；
+   *   若给它们起 `--fs-2xs` 之类体面的名字，反而会让人误以为这是有意设计的一档。
+   *   （`--fs-11-5` 这种写法不是笔误：它就是 11.5px。）
+   *
+   * ★ 低于 12px 的两档（--fs-11 / --fs-11-5）与 DESIGN.md 第三章原来的
+   *   "`--fs-pre` 是**唯一**允许低于 12px 的字号"相冲突。
+   *   它们是**既有事实的显影**，不是本轮新引入的字号：这 15 处声明原本就是
+   *   11px / 11.5px 字面量，只是从前藏在护栏之外看不见。是否把它们抬到 12px
+   *   属界面决策（会改变渲染），不在"收敛"范围内。
+   *   第 41 轮已按同一结论修好**文档与测试**这一侧：DESIGN.md 第三章改为
+   *   "低于 12px 只有三档（--fs-pre / --fs-11 / --fs-11-5）"，测试令牌名正则
+   *   从 `--fs-[a-z]+` 改为 `--fs-[a-z0-9-]+`，让数值名不再隐形。
+   *   —— 文档说实话、测试看得见，比"改字号去迁就措辞"更安全。
+   *
+   * 为什么必须同步 stylelint.config.mjs 的字号白名单：
+   *   白名单是**枚举**式的，新增令牌而不加白名单，收敛后的写法会立刻变成
+   *   新违规 —— 那就成了"令牌层与白名单两处真相"，与本次要修的病同源。 */
+  --fs-11:    11px;   /* 次要元信息：路径 / 分类标签 / 计数（.meta-info-label、.workspace-item-path、.skill-category-tag、.nav-guide-tag…）共 10 处 */
+  --fs-11-5:  11.5px; /* 最小徽章与原文块：.nav-group-label、.guide-test-badge、.danger-tag-badge、.log-raw-pre，共 5 处 */
+  --fs-12-5:  12.5px; /* 二级说明与表单标签：.topbar-subtitle、.meta-info-value、.modal-form-item label、.setting-select…共 21 处 */
+  --fs-13-5:  13.5px; /* 导航项 / 区块小标题：.nav-item、.advanced-block-title…共 26 处 */
+  --fs-14-5:  14.5px; /* 卡片级标题：.task-card-title、.health-issue-title、.guide-step-row-title…共 5 处 */
+  --fs-15:    15px;   /* 区块 h3 与紧凑行名：.settings-section-heading h3、.deploy-card-heading h3、.compact-row-name…共 9 处 */
+  --fs-15-5:  15.5px; /* 任务区块 h3（.task-section-card .settings-section-heading h3），单处 */
+  --fs-17-5:  17.5px; /* 第 45 轮补：界面重写引入的唯一一档 17.5px 字号，按原值新增 */
+  --fs-18:    18px;   /* 页面主标题：.topbar h1、.overview-hero-title，共 2 处 */
+  --fs-22:    22px;   /* 指标大字（.metric-value-display），单处 */
+  --fs-23:    23px;   /* 第 45 轮补：.topbar h1 在重写后用的是 23px（与 --fs-22 不等，故单独一档） */
+
+  /* ---- 字体族（第 31 轮新增）-------------------------------------------
+   * 用户第 31 轮第 1 条：「确保全局使用规范的系统字体栈」。
+   *
+   * 改前两个表面各写一套：
+   *   styles.css  : "Segoe UI Variable", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif
+   *   browser.css : Inter, "Segoe UI", "Microsoft YaHei UI", sans-serif
+   * 缺 system-ui / -apple-system / PingFang SC，中文实际落到哪一族由
+   * 平台的隐式回退决定 —— 在 Windows 上就是 Microsoft YaHei UI，
+   * 它的字面比 Segoe UI 宽，混排时行内中英基线不齐、字重跳变，
+   * 表现即用户说的"文字挤压、笔画变形"。
+   *
+   * 新栈把"系统中文字体"显式排进回退链（PingFang SC / Microsoft YaHei /
+   * Source Han Sans SC / Noto Sans CJK SC / Hiragino Sans GB），
+   * 中文不再被动等回退；两个表面共用同一令牌，字体栈不再分叉。
+   *
+   * ★ 第 41 轮补齐两件事：
+   *   ① 注释里点名了 Noto Sans CJK SC，值里却没有它 —— 现在补进回退链
+   *      （它排在 Source Han Sans SC 之后，Windows 上不生效，只是把
+   *      "注释说的"和"值写的"对齐，缺思源黑体的 Linux 机器才用得到）；
+   *   ② browser.css **不加载本文件**（两套表面色同名不同值，见 DESIGN.md §一），
+   *      所以它的 :root 里必须逐字镜像这条栈 —— 由
+   *      tests/task-page-round31.test.js 逐族比对守着。
+   *      这里把 late fallback（Noto Sans CJK SC / Helvetica Neue / Arial）
+   *      与 browser.css 对齐后，两边取值完全一致且**不改任何 Windows 渲染**：
+   *      前面每一族都先命中，新增的都在更后面。
+   *
+   * 放在 :root 单一处。它不含颜色，浅色主题无需覆盖。 */
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Source Han Sans SC", "Noto Sans CJK SC", "Helvetica Neue", Arial, sans-serif;
+
+  /* 等宽：日志 / 路径 / 命令回显 / 终端 */
+  --font-mono: Consolas, "SFMono-Regular", "Cascadia Code", "Courier New", monospace;
+
+  /* ---- 间距尺度（新增，用于逐步替换散落 padding/margin 数值）----------- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+
+  /* ---- 统一设计系统标准语义 Tokens ------------------------------------ */
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-subtle: var(--surface-2);
+  --color-text: var(--text);
+  --color-text-muted: var(--muted);
+  --color-border: var(--border);
+  --color-border-subtle: color-mix(in srgb, var(--border) 40%, transparent);
+  --color-primary: var(--btn-primary-bg);
+  --color-primary-fg: var(--btn-primary-fg);
+  --color-success: var(--green);
+  --color-warning: var(--yellow);
+  --color-danger: var(--red);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-base: 14px;
+  --font-size-md: 15px;
+  --font-size-lg: 16px;
+  --font-size-xl: 22px;
+
+  --control-height-sm: 30px;
+  --control-height-md: 34px;
+  --control-height-lg: 40px;
+
+  /* ---- 全局密度系统尺度 (Density Tokens) ------------------------------- */
+  --density-compact-row-height: 40px;
+  --density-default-row-height: 48px;
+  --density-comfortable-row-height: 56px;
+
+  --density-compact-section-padding: 12px 16px;
+  --density-default-section-padding: 16px 20px;
+  --density-comfortable-section-padding: 20px 24px;
+
+  --page-max-width: 980px;
+  --page-padding-x: 24px;
+  --page-padding-y: 24px;
+}
+
+
+/* 注意：必须同时匹配 :root[data-theme="light"]。
+ * theme-bootstrap.js 会把 data-theme 同时写到 <html> 与 <body>，
+ * 但 <html> 不匹配 body[...] 选择器 —— 若只写 body[...]，
+ * 浅色主题下 <html> 会落到 :root 的深色令牌上（原实现即此缺陷）。 */
+:root[data-theme="light"],
+body[data-theme="light"] {
+  color-scheme: light;
+
+  --bg:            #ffffff;
+  --sidebar:       #fbfbfc;
+  --surface:       #ffffff;
+  --surface-2:     #f7f7f8;
+  --surface-3:     #eeeeee;
+
+  --console-bg:    #f7f7f9;
+  --console-text:  #24292f;
+
+  --text:          #1f2328;
+  --muted:         #656d76;
+  --muted-2:       #8c959f;
+  --text-3:        #57606a;
+
+  /* ---- 强调色（本次修订补齐）--------------------------------------------
+   * 此前浅色主题【完全没有定义】这一组，直接继承了 :root 的深色取值
+   * （#6c8cff / #42d392 / #f4be5b / #ff6b79 —— 为深色底挑的高明度色）。
+   * 它们落到浅色底上全线崩塌，实测最低值：
+   *   --green  #42d392  -> 1.63:1
+   *   --yellow #f4be5b  -> 1.45:1
+   *   --red    #ff6b79  -> 2.34:1
+   *   --blue   #6c8cff  -> 2.62:1
+   *   --cyan   #40d7e8  -> 1.48:1（对进度条轨道，几乎不可见）
+   *   --violet #9c7cff  -> 2.65:1
+   * 故按"深色取值只调明度、不换色相"补一组浅色专用值。
+   * 半透明同色底仍用旧色相字面量，色相不变即可继续成立。 */
+  --blue:          #2b59ff;  /* 原继承 #6c8cff（surface-3 上 2.62:1）→ 4.50 / 4.88 / 5.28 / 5.01 / 4.67 */
+  --green:         #007d45;  /* 原继承 #42d392（1.63:1）→ 4.45 / 4.83 / 5.22 / 4.95 / 4.61 */
+  --yellow:        #946000;  /* 原继承 #f4be5b（1.45:1）→ 4.55 / 4.94 / 5.34 / 5.06 / 4.72 */
+  /* 各实际背景最低 4.52:1（最紧处仍是 .build-summary.failed 的红字红底）。 */
+  --red:           #da0015;
+  /* violet / cyan 只用于 .progress-track 的渐变（见 styles.css:137）。
+   * 压在 --surface-3 轨道上，浅色下分别只有 2.65:1 / 1.48:1，末端几乎看不见。 */
+  --violet:        #8f6bff;  /* 对轨道 3.13:1 */
+  --cyan:          #1393a2;  /* 对轨道 3.13:1，原继承值仅 1.48:1 */
+
+  --border:        rgba(20, 25, 35, .17);
+  --border-strong: rgba(20, 25, 35, .28);
+
+  --chrome-bg:     #ffffff;
+  --chrome-border: #dedede;
+  --chrome-text:   #3d3d3d;
+
+  --nav-active-bg:   #ececec;
+  --nav-active-text: #202123;
+
+  --chrome-divider:  #e7e7e7;
+  --topbar-bg:       #ffffff;
+  --overlay-bg:      rgba(255,255,255,.8);
+
+  /* 浅色主题下主操作按钮保持统一的高级品牌强调蓝 */
+  --btn-primary-bg:  #2563eb;
+  --btn-primary-fg:  #ffffff;
+
+  --node-bg:         rgba(255,255,255,.8);
+
+  --shadow:        0 1px 2px rgba(20, 25, 35, .06);
+}
+
+:root[data-theme="custom"],
+body[data-theme="custom"] {
+  color-scheme: dark;
+
+  --bg:            #0f172a;
+  --sidebar:       #0b1120;
+  --surface:       #1e293b;
+  --surface-2:     #283548;
+  --surface-3:     #38475c;
+
+  --console-bg:    #070d19;
+  --console-text:  #e2e8f0;
+
+  --text:          #f8fafc;
+  --muted:         #94a3b8;
+  --muted-2:       #64748b;
+  --text-3:        #cbd5e1;
+
+  --border:        rgba(148, 163, 184, .18);
+  --border-strong: rgba(148, 163, 184, .32);
+
+  --blue:          var(--custom-accent, #6366f1);
+  --blue-2:        var(--custom-accent, #6366f1);
+  --violet:        #c084fc;
+  --cyan:          #38bdf8;
+  --green:         #34d399;
+  --yellow:        #fbbf24;
+  --red:           #f87171;
+
+  --chrome-bg:     #0f172a;
+  --chrome-border: #1e293b;
+  --chrome-text:   #f8fafc;
+
+  --nav-active-bg:   color-mix(in srgb, var(--custom-accent, #6366f1) 24%, #1e293b);
+  --nav-active-text: #ffffff;
+  --chrome-divider:  #1e293b;
+  --topbar-bg:       rgba(15, 23, 42, .96);
+  --btn-primary-bg:  var(--custom-accent, #6366f1);
+  --btn-primary-fg:  #ffffff;
+}
+
+/* ============================================================================
+ * 可选：ChatGPT 中性灰配色方案
+ * ----------------------------------------------------------------------------
+ * 背景：settings-compact.css 的存在说明产品方向是"让管理界面看起来像 ChatGPT"。
+ *      但它用 133 个 !important 逐条覆盖来实现，代价是样式彻底失控。
+ *
+ *      正确做法是——不改 CSS，只改上面的令牌值。
+ *      把 :root 与 light 主题里的表面/文字色换成下面这套，然后
+ *      直接删除 settings-compact.css（其颜色部分即可全部由令牌替代）。
+ *
+ *      经核对，settings-compact.css 143 行中：
+ *        · 约 100 行是颜色 / 圆角 / 字号覆盖 -> 可由令牌完全替代
+ *        · 约 40 行是真实布局增量（栅格宽度、高度、内边距）-> 需合并进 styles.css
+ *
+ * 启用方式：取消注释，并替换上面 :root / body[data-theme="light"] 中对应的值。
+ * ----------------------------------------------------------------------------
+ *
+ * :root {
+ *   --bg:            #181818;
+ *   --sidebar:       #171717;
+ *   --surface:       #212121;
+ *   --surface-2:     #252525;
+ *   --surface-3:     #303030;
+ *   --chrome-bg:     #212121;
+ *   --chrome-border: #303030;
+ *   --chrome-text:   #ececec;
+ *   --text:          #ffffff;
+ *   --muted:         #a3a3a3;
+ *   --muted-2:       #8e8e8e;
+ *   --nav-active-bg:   #303030;
+ *   --nav-active-text: #ffffff;
+ * }
+ *
+ * body[data-theme="light"] {
+ *   --bg:            #f7f7f8;
+ *   --sidebar:       #f7f7f8;
+ *   --surface:       #ffffff;
+ *   --surface-2:     #f7f7f8;
+ *   --surface-3:     #ececec;
+ *   --chrome-bg:     #ffffff;
+ *   --chrome-border: #e7e7e7;
+ *   --chrome-text:   #202123;
+ *   --text:          #202123;
+ *   --muted:         #6e6e80;
+ *   --muted-2:       #8e8ea0;
+ *   --nav-active-bg:   #ececec;
+ *   --nav-active-text: #202123;
+ * }
+ * ========================================================================== */

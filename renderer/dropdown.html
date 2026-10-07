@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="dropdown.css">
+  <style>
+    .workspace-item.is-active {
+      background: var(--bg-current) !important;
+      border: 1px solid transparent !important;
+      outline: none !important;
+      box-shadow: none !important;
+    }
+    .manage-workspace,
+    .manage-workspace:focus,
+    .manage-workspace:focus:not(:focus-visible) {
+      border: 1px solid transparent !important;
+      outline: none !important;
+      box-shadow: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="dropdown-wrapper">
+    <div class="dropdown" id="dropdownCard" role="dialog" aria-label="工作区切换" tabindex="-1">
+      <!-- 1. 当前项目概览区 (现代 Hero 概览风格，大气舒展，有深度质感) -->
+      <section class="project-hero-card">
+        <div class="hero-icon-box" aria-hidden="true">
+          <svg class="hero-folder-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+          </svg>
+        </div>
+        <div class="hero-info-content">
+          <div class="hero-title-row">
+            <strong class="hero-project-name" id="projectName"></strong>
+            <span class="hero-status-badge" id="heroStatusBadge">
+              <span class="hero-status-pulse" aria-hidden="true"></span>
+              当前活跃
+            </span>
+          </div>
+          <div class="hero-path-row" id="projectPathRow" title="">
+            <span class="hero-path-text" id="projectPath"></span>
+          </div>
+        </div>
+        <button type="button" class="hero-remove-btn" id="heroRemoveBtn" title="从工作区列表中移除当前项目" aria-label="移除当前工作区" style="display: none;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            <line x1="10" y1="11" x2="10" y2="17"></line>
+            <line x1="14" y1="11" x2="14" y2="17"></line>
+          </svg>
+        </button>
+      </section>
+
+      <!-- 2. 工作区标题栏 (两端对齐：可用工作区 / 数量) -->
+      <div class="workspace-header">
+        <span class="workspace-header-title">可用工作区</span>
+        <span class="workspace-header-count" id="workspaceCount"></span>
+      </div>
+
+      <!-- 3. 工作区滚动列表 (整行可点击，键盘上下切换高亮) -->
+      <div class="workspace-list" id="workspaceList" role="listbox" tabindex="-1">
+        <!-- 动态生成 -->
+      </div>
+
+      <!-- 4. 低对比度分隔线 -->
+      <div class="dropdown-divider" aria-hidden="true"></div>
+
+      <!-- 5. 管理工作区入口 (正常无黄色边框，仅 focus-visible 时高亮) -->
+      <button type="button" class="manage-workspace" id="manageBtn">
+        <span class="manage-left">
+          <svg class="gear-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          <span>管理工作区…</span>
+        </span>
+        <span class="manage-arrow" aria-hidden="true">›</span>
+      </button>
+    </div>
+  </div>
+
+  <script src="dropdown.js"></script>
+</body>
+</html>

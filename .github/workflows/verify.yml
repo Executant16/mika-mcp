@@ -1,0 +1,65 @@
+name: verify
+
+# 门禁触发时机：
+#   - push 到任意分支
+#   - 所有 PR
+#   - 手动（workflow_dispatch）
+# 刻意不做 paths 过滤：样式改动会跨 renderer/、tests/、scripts/ 多处，
+# 漏跑比多跑代价大得多。
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# 同一分支的旧运行被新提交取代时自动取消，省额度也省等待。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    # 必须是 Windows：
+    #   1. resources/tools/*.exe 是 Windows 二进制，source-bundle 测试硬依赖
+    #   2. test_windows_process_tree_v024.py 用 os.name == "nt" 判定是否执行
+    #      —— 换到 Linux 会静默跳过，等于少测
+    #   3. scripts/run-python-tests.js 用 path.delimiter 拼 PYTHONPATH
+    #      （Windows 上是 ";"，Linux 上是 ":"）
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # --ignore-scripts：本仓库 devDependencies 里只有 electron 一个会装二进制，
+      #   而 electron 包的 package.json 里 scripts 是空的 —— 实测无 postinstall。
+      #   唯一带 install 脚本的是 electron-winstaller（electron-builder 的传递依赖，
+      #   本项目并未使用它）。故 --ignore-scripts 安全，且能省掉一次无谓的下载。
+      - name: 安装依赖
+        run: npm ci --ignore-scripts
+
+      - name: 契约检查（python 测试 + node 测试 + 根目录清洁）
+        run: npm test
+        env:
+          # 让 require('electron') 立即返回，不触发 100MB 二进制下载。
+          # 依据：node_modules/electron/index.js 的 getElectronPath() 在
+          # process.env.ELECTRON_OVERRIDE_DIST_PATH 存在时**先于下载逻辑返回**。
+          # 该 require 是必需的 —— tests/chat-recovery.test.js 会加载
+          # electron/chatViewController.js，后者第 1 行就解构 require('electron')。
+          # 实测：指向一个不存在的目录也能让 96 个 node 测试全部通过，
+          # 因为没有任何测试会去执行那个二进制。
+          ELECTRON_OVERRIDE_DIST_PATH: ${{ runner.temp }}/electron-stub
+          PYTHONIOENCODING: utf-8
+
+      - name: 样式违规棘轮（只拦新增，存量见 stylelint-baseline.json）
+        run: npm run check:css-ratchet
+
+      - name: 语义色对比度守卫（DESIGN.md 六.7）
+        run: npm run check:contrast

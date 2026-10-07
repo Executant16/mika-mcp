@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>服务状态详情</title>
+  <link rel="stylesheet" href="health-dropdown.css">
+</head>
+<body>
+  <div class="health-wrapper">
+    <div class="health-card" id="healthCard" role="dialog" aria-label="服务状态概览" tabindex="-1">
+      
+      <!-- 头部状态行 -->
+      <div class="health-header">
+        <div class="header-left">
+          <span class="header-indicator-dot" id="headerDot"></span>
+          <span class="header-title">系统服务运行状态</span>
+        </div>
+        <div class="header-right">
+          <span class="status-summary-pill" id="summaryPill">检查中</span>
+        </div>
+      </div>
+
+      <!-- 服务列表区 -->
+      <div class="service-list">
+        
+        <!-- 1. 本地 MCP 工具 -->
+        <div class="service-item" id="mcpItem">
+          <div class="service-icon-box" id="mcpIconBox">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+            </svg>
+          </div>
+          <div class="service-main">
+            <div class="service-title-row">
+              <strong class="service-name">本地 MCP 工具</strong>
+              <span class="service-state-tag" id="mcpStateTag">未运行</span>
+            </div>
+            <div class="service-desc">提供本地代码工作区读写、测试构建与终端命令执行能力</div>
+          </div>
+          <div class="service-action-area">
+            <button type="button" class="btn-action" id="mcpActionBtn">
+              <span class="btn-spinner" aria-hidden="true"></span>
+              <span class="btn-text">启动服务</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. OpenAI Tunnel 连接通道 -->
+        <div class="service-item" id="tunnelItem">
+          <div class="service-icon-box" id="tunnelIconBox">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            </svg>
+          </div>
+          <div class="service-main">
+            <div class="service-title-row">
+              <strong class="service-name">连接通道 (OpenAI Tunnel)</strong>
+              <span class="service-state-tag" id="tunnelStateTag">未连接</span>
+            </div>
+            <div class="service-desc">打通 ChatGPT 云端与本地服务的反向代理加密通信链路</div>
+          </div>
+          <div class="service-action-area">
+            <button type="button" class="btn-action btn-secondary" id="tunnelActionBtn">
+              <span class="btn-text">配置凭据 →</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 底部快捷操作与辅助信息 -->
+      <div class="health-footer">
+        <button type="button" class="footer-link-btn" id="gotoHealthBtn">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="14 8 11.5 8 9.5 14 6.5 2 4.5 8 2 8"/>
+          </svg>
+          <span>完整故障诊断与自检</span>
+        </button>
+        <button type="button" class="footer-link-btn" id="gotoSettingsBtn">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 4h-7"/>
+            <path d="M10 4H3"/>
+            <path d="M21 12h-9"/>
+            <path d="M8 12H3"/>
+            <path d="M21 20h-5"/>
+            <path d="M12 20H3"/>
+            <path d="M14 2v4"/>
+            <path d="M8 10v4"/>
+            <path d="M16 18v4"/>
+          </svg>
+          <span>管理中心高级设置</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="health-dropdown.js"></script>
+</body>
+</html>

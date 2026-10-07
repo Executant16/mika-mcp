@@ -1,0 +1,73 @@
+{
+  "name": "mika-mcp",
+  "version": "0.1.0",
+  "description": "一键部署与管理 Coding Tools MCP、OpenAI Tunnel 和 ChatGPT 接入的 Windows 桌面助手",
+  "author": {
+    "name": "Executant16"
+  },
+  "license": "MIT",
+  "main": "electron/main.js",
+  "scripts": {
+    "icon:build": "node scripts/generate-icon.js",
+    "start": "electron . --no-sandbox --disable-gpu --enable-logging",
+    "test": "node scripts/run-python-tests.js && node --test tests/*.test.js && node scripts/check-source-root-clean.js",
+    "lint:css": "stylelint \"renderer/**/*.css\"",
+    "check:css-ratchet": "node scripts/check-css-ratchet.js",
+    "check:contrast": "node scripts/check-contrast.js",
+    "verify": "npm test && npm run check:css-ratchet && npm run check:contrast",
+    "audit:prod": "npm audit --omit=dev",
+    "dist": "npm run icon:build && npm test && electron-builder --win nsis && node scripts/touch-dist-timestamps.js",
+    "dist:dir": "npm run icon:build && electron-builder --dir && node scripts/touch-dist-timestamps.js"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  },
+  "devDependencies": {
+    "electron": "43.2.0",
+    "electron-builder": "^26.15.3",
+    "stylelint": "^17.15.0"
+  },
+  "build": {
+    "electronDist": "node_modules/electron/dist",
+    "appId": "com.executant.mika-mcp",
+    "productName": "Mika MCP",
+    "copyright": "Copyright © 2026 Executant Studio",
+    "publish": null,
+    "artifactName": "mika-mcp-setup-${version}.${ext}",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "package.json",
+      "electron/**/*",
+      "renderer/**/*",
+      "LICENSE",
+      "THIRD_PARTY_NOTICES.md"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "resources"
+      }
+    ],
+    "win": {
+      "icon": "electron/app-icon.ico",
+      "legalTrademarks": "Executant Studio",
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "Mika MCP",
+      "installerIcon": "electron/app-icon.ico",
+      "uninstallerIcon": "electron/app-icon.ico",
+      "installerHeaderIcon": "electron/app-icon.ico",
+      "runAfterFinish": true
+    }
+  }
+}

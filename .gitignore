@@ -1,0 +1,32 @@
+node_modules/
+dist/
+build/
+out/
+.electron-builder-cache/
+.cache/
+.codex*
+.coding-tools*
+.env
+.env.*
+*.local
+*.log
+*.tmp
+*.bak
+resources/native-python/
+resources/*.zip
+.DS_Store
+
+# Python 缓存（AGENTS.md 明确禁止提交 __pycache__/.pyc）
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 运行/探测产物（含启动日志、沙箱探针目录）
+启动日志.txt
+inspect_current.png
+.probe-userdata*/
+
+# WorkBuddy AI 内部数据目录（隐私，不入库）
+.workbuddy-ai/
+

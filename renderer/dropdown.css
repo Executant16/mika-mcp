@@ -1,0 +1,483 @@
+:root {
+  --bg-card: #ffffff;
+  --bg-subtle: #f8fafc;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-active: rgba(0, 0, 0, 0.07);
+  --bg-current: rgba(0, 0, 0, 0.035);
+  --bg-current-hover: rgba(0, 0, 0, 0.06);
+  --border-card: rgba(0, 0, 0, 0.08);
+  --border-subtle: rgba(0, 0, 0, 0.05);
+  --border-current: rgba(0, 0, 0, 0.06);
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+  --primary: #0f172a;
+  --focus-color: #0f172a;
+  --dot-color: #94a3b8;
+  --shadow: 0 4px 14px -1px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="dark"] {
+  --bg-card: #20232a;
+  --bg-subtle: #191c22;
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-active: rgba(255, 255, 255, 0.10);
+  --bg-current: rgba(255, 255, 255, 0.06);
+  --bg-current-hover: rgba(255, 255, 255, 0.09);
+  --border-card: rgba(255, 255, 255, 0.09);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-current: rgba(255, 255, 255, 0.08);
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  --primary: #f1f5f9;
+  --focus-color: #f1f5f9;
+  --dot-color: #64748b;
+  --shadow: 0 6px 18px -1px rgba(0, 0, 0, 0.40), 0 2px 4px rgba(0, 0, 0, 0.20);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-app-region: no-drag;
+}
+
+html, body {
+  background: transparent !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  overflow: hidden;
+}
+
+.dropdown-wrapper {
+  padding: 4px 8px 10px 8px;
+}
+
+/* 主面板：桌面系统级立体浮层，与主界面景深分明，大气开阔 */
+.dropdown {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 14px;
+  box-shadow: var(--shadow) !important;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  outline: none;
+  transform: none;
+}
+
+.dropdown:focus {
+  outline: none;
+}
+
+/* 1. 当前项目概览区：现代 Hero 概览卡片，厚实质感，彻底告别小气 */
+.project-hero-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="dark"] .project-hero-card {
+  background: linear-gradient(180deg, #1e222b 0%, #171a21 100%);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* 左侧图标卡片底座 */
+.hero-icon-box {
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .hero-icon-box {
+  background: #282c35;
+  border-color: rgba(255, 255, 255, 0.10);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.hero-folder-svg {
+  width: 20px;
+  height: 20px;
+  color: #334155;
+}
+
+[data-theme="dark"] .hero-folder-svg {
+  color: #cbd5e1;
+}
+
+/* 右侧信息排版 */
+.hero-info-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hero-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hero-project-name {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hero-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #059669;
+  background: rgba(16, 185, 129, 0.10);
+  border: 1px solid rgba(16, 185, 129, 0.20);
+  padding: 2px 8px;
+  border-radius: 999px;
+  line-height: 1.3;
+  flex-shrink: 0;
+  letter-spacing: 0.2px;
+}
+
+[data-theme="dark"] .hero-status-badge {
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.hero-status-pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
+}
+
+[data-theme="dark"] .hero-status-pulse {
+  background: #34d399;
+  box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.3);
+}
+
+.hero-path-row {
+  display: flex;
+  align-items: center;
+}
+
+.hero-path-text {
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hero-remove-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+
+.hero-remove-btn:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+/* 2. 工作区标题栏：可用工作区 / 数量 两端对齐，优雅留白 */
+.workspace-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px 0 4px;
+}
+
+.workspace-header-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+}
+
+.workspace-header-count {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+/* 3. 工作区滚动列表：支持双行排版与现代舒适行高 */
+.workspace-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 1px 2px;
+  scrollbar-width: thin;
+}
+
+.workspace-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.workspace-list::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 4px;
+}
+
+/* 工作区单行项：双行结构、大方舒展、整行可点击 */
+.workspace-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 14px;
+  border-radius: 9px;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease;
+  text-align: left;
+  pointer-events: auto;
+  outline: none;
+}
+
+.workspace-item:hover,
+.workspace-item.is-keyboard-focused {
+  background: var(--bg-hover);
+}
+
+.workspace-item:active {
+  background: var(--bg-active);
+}
+
+.workspace-item:focus,
+.workspace-item:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+  border-color: transparent;
+}
+
+/* 当前激活工作区：柔和中性微淡底与精细边框，高级沉稳 */
+.workspace-item.is-active {
+  background: var(--bg-current);
+  border: 1px solid var(--border-current) !important;
+  outline: none !important;
+}
+
+.workspace-item.is-active:hover,
+.workspace-item.is-active.is-keyboard-focused {
+  background: var(--bg-current-hover);
+  border: 1px solid var(--border-current) !important;
+}
+
+/* 左侧状态点容器：18px 居中对齐 */
+.item-status-wrapper {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* 状态指示圆点（未选中：低饱和中性淡灰） */
+.item-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dot-color);
+  opacity: 0.55;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* hover 未激活项时，圆点轻微变实 */
+.workspace-item:hover:not(.is-active) .item-dot {
+  opacity: 0.95;
+  background: var(--text-muted);
+}
+
+/* 激活项翡翠绿圆点：现代呼吸感微光环 */
+.workspace-item.is-active .item-dot {
+  width: 8px;
+  height: 8px;
+  background: #10b981;
+  opacity: 1;
+  box-shadow: 0 0 0 2.5px rgba(16, 185, 129, 0.22);
+}
+
+[data-theme="dark"] .workspace-item.is-active .item-dot {
+  background: #34d399;
+  box-shadow: 0 0 0 2.5px rgba(52, 211, 153, 0.25);
+}
+
+/* 中间双行信息区 */
+.item-meta {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2.5px;
+  justify-content: center;
+}
+
+.item-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.item-path {
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.25;
+}
+
+.workspace-item.is-active .item-path {
+  color: var(--text-muted);
+  opacity: 0.9;
+}
+
+/* 右侧徽章容器 */
+.item-right-area {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* 当前 Badge：现代精致微胶囊 */
+.active-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: #047857;
+  background: rgba(16, 185, 129, 0.09);
+  border: 1px solid rgba(16, 185, 129, 0.18);
+  padding: 2px 7px;
+  border-radius: 5px;
+  line-height: 1.3;
+  letter-spacing: 0.2px;
+}
+
+[data-theme="dark"] .active-tag {
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.22);
+}
+
+.empty-tip {
+  text-align: center;
+  padding: 20px 10px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+/* 4. 低对比度分隔线 */
+.dropdown-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 2px 2px;
+}
+
+/* 5. 底部管理入口：高度 40px，舒适开阔 */
+.manage-workspace {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+  pointer-events: auto;
+  outline: none;
+  box-shadow: none;
+}
+
+.manage-workspace:hover {
+  background: var(--bg-hover);
+  color: var(--text-main);
+  border-color: transparent;
+  outline: none;
+  box-shadow: none;
+}
+
+.manage-workspace:focus-visible {
+  outline: 2px solid var(--focus-color) !important;
+  outline-offset: 1px;
+}
+
+.manage-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.gear-svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.manage-workspace:hover .gear-svg {
+  transform: rotate(30deg);
+}
+
+.manage-arrow {
+  font-size: 15px;
+  font-weight: 300;
+  color: var(--text-dim);
+  transition: transform 0.14s ease;
+}
+
+.manage-workspace:hover .manage-arrow {
+  transform: translateX(2px);
+  color: var(--text-muted);
+}

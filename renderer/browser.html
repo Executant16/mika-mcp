@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self';style-src 'self';script-src 'self';img-src 'self' data:;media-src 'self' data: blob:;">
+  <title>Mika MCP</title>
+  <link rel="stylesheet" href="browser.css">
+</head>
+<body>
+  <script src="theme-bootstrap.js"></script>
+  <header class="browser-toolbar">
+    <div class="toolbar-main">
+      <!-- 左侧：后退、前进、刷新 + 统一项目/工作区选择器 -->
+      <div class="toolbar-left">
+        <div class="nav-actions">
+          <button id="backButton" class="nav-button" title="后退" disabled>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <button id="forwardButton" class="nav-button" title="前进" disabled>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
+          <button id="reloadButton" class="nav-button" title="刷新">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg>
+          </button>
+        </div>
+        <div class="toolbar-divider" aria-hidden="true"></div>
+        <div class="workspace-switcher" id="workspaceSwitcher">
+          <button id="workspaceTrigger" class="workspace-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="workspaceMenu" title="切换工作区">
+            <svg class="workspace-trigger-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <div class="workspace-trigger-text">
+              <span class="workspace-project-title" id="activeProjectLabel">未选择项目</span>
+              <strong class="workspace-active-title" id="activeWorkspaceLabel">未选择工作区</strong>
+            </div>
+            <b class="workspace-trigger-caret" aria-hidden="true">&#9662;</b>
+          </button>
+          <button id="workspaceHealthDot" class="workspace-health-dot" title="查看工作区同步状态" aria-label="查看工作区同步状态"></button>
+
+          <!-- 自定义分层下拉菜单 -->
+          <div class="workspace-menu" id="workspaceMenu" hidden>
+            <div class="workspace-menu-section">
+              <div class="workspace-menu-label">当前项目</div>
+              <div class="workspace-menu-project-card">
+                <i class="workspace-menu-folder-icon" aria-hidden="true"></i>
+                <code id="workspaceMenuPath" class="workspace-menu-path">-</code>
+              </div>
+            </div>
+            <div class="workspace-menu-divider" aria-hidden="true"></div>
+            <div class="workspace-menu-section">
+              <div class="workspace-menu-label">工作区</div>
+              <div class="workspace-menu-list" id="workspaceMenuList"></div>
+            </div>
+            <div class="workspace-menu-divider" aria-hidden="true"></div>
+            <button id="manageWorkspacesButton" class="workspace-menu-manage-btn" type="button">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+              <span>管理工作区…</span>
+            </button>
+          </div>
+
+          <!-- 工作区健康状态详情弹层 -->
+          <div id="workspaceHealthPopover" class="workspace-health-popover" hidden>
+            <b id="workspaceHealthName">未选择工作区</b>
+            <span id="workspaceHealthState">等待检查</span>
+            <em id="workspaceHealthTime">-</em>
+            <button type="button" class="popover-close" id="workspaceHealthClose" aria-label="关闭">&times;</button>
+            <code id="workspaceHealthPath">-</code>
+          </div>
+          <span id="switchState" class="switch-state" role="status" aria-live="polite" hidden></span>
+        </div>
+      </div>
+
+      <!-- 兼容历史断言与事件绑定的隐式节点（不占任何布局） -->
+      <div class="compat-hidden-stash" hidden aria-hidden="true" style="display:none!important">
+        <span id="workspaceList"></span>
+        <button id="addWorkspace" class="add-workspace" type="button" style="display:none"></button>
+        <span class="workspace-bar"></span>
+        <select id="workspaceSelect" class="workspace-select" aria-label="切换工作区"><option value="">选择要切换的工作区…</option></select>
+      </div>
+
+      <!-- 右侧：服务运行状态 + 当前任务状态 + 设置 -->
+      <div class="toolbar-right system-area">
+        <div class="page-state" id="pageState" hidden><i></i><span>正在准备 ChatGPT…</span></div>
+        <div class="service-state">
+          <span id="downloadState" class="download-state"></span>
+          <button id="healthPill" class="health-pill" title="查看本地工具与连接通道状态">
+            <i aria-hidden="true"></i><span id="healthPillText">状态检查中</span>
+          </button>
+          <!-- 永久隐藏的兼容弹层（第 41 轮：删掉了 #healthPopoverPath 与 #healthActionBtn ——
+               它们没有任何样式、也不可达；容器与两个状态灯必须留下，
+               tests/toolbar-round32.test.js 指定这里是 #mcpState / #tunnelState 唯一的家） -->
+          <div id="healthPopover" class="health-popover" hidden style="display:none !important;">
+            <span id="mcpState" title="Coding Tools MCP 本地服务状态"><i></i>本地工具</span>
+            <span id="tunnelState" title="OpenAI Tunnel 连接状态"><i></i><em id="connectionStateLabel">连接通道</em></span>
+          </div>
+        </div>
+        <div class="task-strip" id="taskStrip">
+          <i></i>
+          <b id="taskTitle">空闲</b>
+          <small id="taskStep"></small>
+          <span class="task-progress" aria-hidden="true"><span id="taskProgressBar"></span></span>
+          <span id="taskProgressText" class="task-progress-text"></span>
+          <button id="pauseTask">暂停</button><button id="resumeTask">继续</button><button id="stopTask">停止</button>
+        </div>
+
+        <!-- 技能与提示词功能按键组 -->
+        <div class="ai-tools-group">
+          <!-- 技能功能键 -->
+          <button id="skillsButton" class="action-card-button" title="展开工程技能抽屉" aria-label="技能" aria-expanded="false">
+            <svg class="action-btn-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>
+            </svg>
+            <span class="action-btn-label">技能</span>
+          </button>
+
+          <!-- 提示词快捷指令功能键 -->
+          <button id="promptsButton" class="action-card-button" title="展开快捷指令抽屉" aria-label="提示词" aria-expanded="false">
+            <svg class="action-btn-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              <line x1="9" y1="9" x2="15" y2="9"/>
+              <line x1="9" y1="13" x2="13" y2="13"/>
+            </svg>
+            <span class="action-btn-label">提示词</span>
+          </button>
+        </div>
+
+        <div class="toolbar-divider" aria-hidden="true"></div>
+        <button id="managerButton" class="manager-button" title="打开管理与设置" aria-label="打开设置"><svg class="manager-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="21" y1="4" x2="14" y2="4"/><line x1="10" y1="4" x2="3" y2="4"/><line x1="21" y1="12" x2="12" y2="12"/><line x1="8" y1="12" x2="3" y2="12"/><line x1="21" y1="20" x2="16" y2="20"/><line x1="12" y1="20" x2="3" y2="20"/><line x1="14" y1="2" x2="14" y2="6"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="16" y1="18" x2="16" y2="22"/></svg><span class="manager-label">设置</span></button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 第 44 轮：自绘窗口按钮（最小化 / 最大化-还原 / 关闭）。
+       原生 titleBarOverlay 已移除 —— 它由 Windows 在独立合成路径上绘制，
+       切主题时总比页面慢半拍（用户反馈"明显延迟，不被允许"）。
+       自绘后三个按钮与顶栏同属一个渲染帧，严格同步。
+       ★ 刻意放在 <header> 之外：它们是**操作系统级窗口装饰**，不属于工具栏的
+         "统一控件词汇表"（toolbar-round32 的设计语言测试会从 header 内部自动
+         推导控件集），混进去会被误判成工具栏控件。这里用 position:fixed 钉右上角。 -->
+  <div class="window-controls" id="windowControls" data-maximized="false">
+    <button id="winMinimize" class="window-control-btn" type="button" title="最小化" aria-label="最小化">
+      <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2 6h8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
+    </button>
+    <button id="winMaximize" class="window-control-btn" type="button" title="最大化" aria-label="最大化">
+      <svg class="wc-icon-max" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><rect x="2.4" y="2.4" width="7.2" height="7.2" rx="1" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>
+      <svg class="wc-icon-restore" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><rect x="2.2" y="4" width="5.8" height="5.8" rx="1" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M4.2 4V2.8a.8.8 0 0 1 .8-.8h4.2a.8.8 0 0 1 .8.8v4.2a.8.8 0 0 1-.8.8H8" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>
+    </button>
+    <button id="winClose" class="window-control-btn window-control-close" type="button" aria-label="关闭">
+      <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <main class="loading-stage" aria-live="polite" aria-busy="true">
+    <div class="loading-card">
+      <div class="loading-brand">
+        <div class="brand-tile">
+          <img class="brand-avatar-img" src="mascot.jpg" alt="Mika - 应用看板娘" onerror="this.style.display='none'">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4.81 5.63 11.05 12 4.81 18.37" stroke="#ffffff" stroke-width="2.89"/>
+            <path d="M13.94 18.37H19.19" stroke="#6c8cff" stroke-width="2.89"/>
+          </svg>
+        </div>
+        <div class="brand-spinner" aria-hidden="true"></div>
+      </div>
+      <h1>正在打开 ChatGPT</h1>
+      <p>网页 MCP 助手已就绪 · 本地工作区安全隔离</p>
+    </div>
+  </main>
+
+  <!-- 右侧抽屉式侧边栏：容纳技能与快捷指令，彻底杜绝 BrowserView 遮挡 -->
+  <aside class="right-drawer-sidebar" id="rightSidebar" hidden>
+    <!-- 左边缘可拖拽调节宽度的调整手柄 -->
+    <div class="sidebar-resize-handle" id="sidebarResizeHandle" aria-label="调节侧边栏宽度"></div>
+    <div class="sidebar-header">
+      <div class="sidebar-tabs-group">
+        <button type="button" class="sidebar-tab-pill active" id="tabSkillsBtn" data-tab="skills">
+          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 1.5 3 9h5l-1 5.5 6-7.5H8l1-5.5Z"/></svg>
+          <span>技能</span>
+        </button>
+        <button type="button" class="sidebar-tab-pill" id="tabPromptsBtn" data-tab="prompts">
+          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 10.5a1.5 1.5 0 0 1-1.5 1.5H5.5L2 14.5V3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v7Z"/></svg>
+          <span>快捷指令</span>
+        </button>
+      </div>
+      <div class="sidebar-ctrl-actions">
+        <button type="button" class="sidebar-collapse-pill" id="closeSidebarBtn" title="收起侧边栏">
+          <span>收起</span>
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 4 4 4-4 4"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- 侧边栏搜索框 -->
+    <div class="sidebar-search-box">
+      <div class="sidebar-search-field">
+        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg>
+        <input type="text" id="sidebarSearchInput" placeholder="快速搜索…" autocomplete="off">
+      </div>
+    </div>
+
+    <!-- 快捷指令分类胶囊条（仅在提示词Tab显示） -->
+    <div class="sidebar-chips-bar" id="sidebarCategoryChips" hidden></div>
+
+    <!-- 滚动列表容器 -->
+    <div class="sidebar-scroll-panel" id="sidebarScrollPanel"></div>
+
+    <!-- 底部直达链接 -->
+    <div class="sidebar-bottom-bar">
+      <button type="button" class="sidebar-jump-link" id="sidebarBottomManageBtn">
+        <span>管理技能与指令库</span>
+        <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 3 5 5-5 5"/></svg>
+      </button>
+    </div>
+  </aside>
+  <script src="browser.js"></script>
+</body>
+</html>
