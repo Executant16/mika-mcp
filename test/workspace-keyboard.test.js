@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const source = fs.readFileSync(path.join(__dirname, '../renderer/dropdown.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '../renderer/dropdown.js'), 'utf8').replace(/\r\n/g, '\n');
 
 test('workspace keyboard respects focused buttons while arrows move focus within its list', () => {
   const body = {}, card = {}, manage = {}, remove = {};
