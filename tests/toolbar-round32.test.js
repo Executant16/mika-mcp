@@ -196,7 +196,7 @@ test('the health pill collapses two status lights into one conclusion and opens 
   const body = extractFunction(source, 'healthPillText');
   const healthPillText = vm.runInNewContext(`(${body})`);
 
-  assert.equal(healthPillText(true, true, false), '服务正常',
+  assert.equal(healthPillText(true, true, false, { loading: false, error: '' }), '服务正常',
     '两项都正常时应给结论，而不是继续列两个"正常"');
   assert.equal(healthPillText(false, true, false), '本地工具未就绪',
     '只有一项异常时应**点名那一项** —— 用户下一步就是去修它');
@@ -224,12 +224,8 @@ test('the health pill collapses two status lights into one conclusion and opens 
   const htmlCode = stripHtml(html);
   const pillFn = source.match(/function renderHealthPill\(mcpRunning, tunnelRunning\)\s*\{[\s\S]*?\n\}/)?.[0] || '';
   assert.ok(pillFn, '应能在 browser.js 里截出 renderHealthPill');
-  assert.match(pillFn, /本地工具：\$\{mcpRunning\s*\?\s*'运行中'\s*:\s*'未运行'\}/,
-    '★ 悬浮 title 必须说明「本地工具」这一项到底是什么状态');
-  assert.match(pillFn, /连接通道：\$\{tunnelRunning\s*\?\s*'已连接'\s*:\s*'未连接'\}/,
-    '★ 同上，另一侧 —— 两项都要查得到，不能只报一个聚合数');
-  assert.match(pillFn, /点击前往配置/, '异常时 title 必须给出下一步（去配置）');
-  assert.match(pillFn, /textContent = healthPillText\(mcpRunning, tunnelRunning, checking\)/,
+  assert.doesNotMatch(pillFn, /pill\.title\s*=/, '状态详情统一在气泡窗内，不使用悬浮提示');
+  assert.match(pillFn, /textContent = healthPillText\(mcpRunning, tunnelRunning, checking, lastChatState\)/,
     '收起态文案必须来自那个纯函数（不得在渲染函数里另写一份字面量）');
 
   /* ③ 点击胶囊必须真的打开当前健康下拉面板。新版把明细交给原生

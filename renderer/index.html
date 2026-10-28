@@ -1078,7 +1078,7 @@
 
             <section class="settings-section">
               <div class="settings-section-heading"><div><h3>启动与运行</h3></div></div>
-              <div class="setting-row"><span><b>开机启动网页 MCP 助手</b></span><input id="startWithWindowsToggle" class="toggle" type="checkbox"></div>
+              <div class="setting-row"><span><b>开机启动网页 MCP 助手</b><small id="startWithWindowsHint">仅正式版可设置，正在确认运行版本…</small></span><input id="startWithWindowsToggle" class="toggle" type="checkbox" disabled></div>
               <div class="setting-row"><span><b>打开助手时自动启动服务</b></span><input id="autoStartToggle" class="toggle" type="checkbox"></div>
               <div class="setting-row"><span><b>关闭后最小化到系统托盘</b></span><input id="keepRunningToggle" class="toggle" type="checkbox" checked></div>
               <div class="setting-row"><span><b>显示系统托盘图标</b></span><input id="showTrayIconToggle" class="toggle" type="checkbox" checked></div>
@@ -1138,6 +1138,46 @@
                   </button>
                   <input id="taskNotificationSoundToggle" class="toggle" type="checkbox" checked>
                 </div>
+              </div>
+            </section>
+
+            <section class="settings-section storage-settings" id="storageSettingsSection">
+              <div class="settings-section-heading">
+                <div>
+                  <h3>数据与存储</h3>
+                  <p>查看配置、登录会话和长期记忆所在位置</p>
+                </div>
+                <span class="storage-badge" id="storageChannelValue" aria-label="运行版本">正在读取…</span>
+              </div>
+              <div class="storage-content">
+                <div class="storage-location-heading">
+                  <b>当前数据目录</b>
+                  <span class="storage-location-kind" id="storageLocationKind"></span>
+                </div>
+                <code class="storage-path storage-current-path" id="storageCurrentPath">正在读取…</code>
+                <div class="storage-actions">
+                  <button type="button" class="secondary-button btn-sm" id="storageOpenBtn">打开目录</button>
+                  <button type="button" class="secondary-button btn-sm" id="storageChangeBtn" disabled>更改位置</button>
+                </div>
+                <p class="storage-hint">更改位置会迁移数据并重启 Mika，原目录会保留，不会清空数据。</p>
+                <details class="storage-details">
+                  <summary>默认位置与长期记忆</summary>
+                  <dl>
+                    <div class="storage-detail-group">
+                      <dt>系统默认位置</dt>
+                      <dd><code class="storage-path" id="storageDefaultPath">正在读取…</code></dd>
+                      <dd class="storage-reset-action">
+                        <button type="button" class="setting-text-action" id="storageResetBtn" disabled>恢复默认位置</button>
+                        <span>将当前数据迁回此处，不是恢复出厂设置。</span>
+                      </dd>
+                    </div>
+                    <div class="storage-detail-group">
+                      <dt>长期记忆目录</dt>
+                      <dd><code class="storage-path" id="storageMemoryPath">正在读取…</code></dd>
+                    </div>
+                  </dl>
+                </details>
+                <p class="storage-message" id="storageStatusMessage" role="status" aria-live="polite">正在读取数据存储状态…</p>
               </div>
             </section>
             </div>

@@ -2,6 +2,11 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('mcpAssistant', {
   snapshot: (options) => ipcRenderer.invoke('app:snapshot', options),
+  storageStatus: () => ipcRenderer.invoke('storage:status'),
+  storageChoose: () => ipcRenderer.invoke('storage:choose'),
+  storagePlan: (target) => ipcRenderer.invoke('storage:plan', target),
+  storageApply: (id) => ipcRenderer.invoke('storage:apply', id),
+  storageOpen: () => ipcRenderer.invoke('storage:open'),
   chooseWorkspace: () => ipcRenderer.invoke('dialog:workspace'),
   switchWorkspace: (workspace) => ipcRenderer.invoke('workspace:switch', workspace),
   workspaceHub: () => ipcRenderer.invoke('workspace:hub'),

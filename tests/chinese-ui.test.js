@@ -6,6 +6,18 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 
+function assertCommonOptionsUnfolded(markup) {
+  let detailsDepth = 0;
+  const tokens = markup.matchAll(/<details\b[^>]*>|<\/details\s*>|<h3>(界面外观|启动与运行|任务反馈)<\/h3>|id="(?:taskNotificationsToggle|taskNotificationSoundToggle|startWithWindowsToggle|autoStartToggle|storageCurrentPath|storageOpenBtn|storageChangeBtn)"/g);
+  for (const [token] of tokens) {
+    if (token.startsWith('<details')) detailsDepth++;
+    else if (token.startsWith('</details')) detailsDepth--;
+    else assert.equal(detailsDepth, 0, `常用设置不得被折叠：${token}`);
+    assert.ok(detailsDepth >= 0, '折叠区结构必须配对');
+  }
+  assert.equal(detailsDepth, 0, '折叠区结构必须配对');
+}
+
 test('chat toolbar uses Chinese-first service labels', () => {
   const html = read('renderer/browser.html');
   const js = read('renderer/browser.js');
@@ -62,10 +74,16 @@ test('settings keep common options visible and move maintenance controls behind 
   const notificationsAt = settingsPage.indexOf('id="taskNotificationsToggle"');
   assert.ok(notificationsAt >= 0 && notificationsAt < advancedAt,
     '★ 保留的原意图：常用项（桌面任务提醒开关）必须仍直接可见，且在高级设置区**之前**');
-  assert.doesNotMatch(commonRegion, /<details/,
-    '★ 常用项必须仍然直接可见，不得被折叠进 <details>（要折叠的是维护项，不是常用项）');
+  assertCommonOptionsUnfolded(commonRegion);
   assert.doesNotMatch(html, /id="taskNotificationOnlyWhenUnfocusedToggle"/);
   assert.doesNotMatch(html, /id="taskNotificationMinSecondsSelect"/);
+});
+
+test('common-setting visibility guard allows path details but rejects folded common controls', () => {
+  assert.doesNotThrow(() => assertCommonOptionsUnfolded('<h3>界面外观</h3><details><summary>路径详情</summary><code>path</code></details>'));
+  assert.throws(() => assertCommonOptionsUnfolded('<details><h3>启动与运行</h3></details>'), /常用设置不得被折叠/);
+  assert.throws(() => assertCommonOptionsUnfolded('<details><input id="taskNotificationsToggle"></details>'), /常用设置不得被折叠/);
+  assert.throws(() => assertCommonOptionsUnfolded('<details><button id="storageChangeBtn"></button></details>'), /常用设置不得被折叠/);
 });
 
 test('build verification defaults to an automatic plan with manual overrides folded away', () => {

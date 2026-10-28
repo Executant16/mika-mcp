@@ -2,6 +2,7 @@ node_modules/
 dist/
 build/
 out/
+/tmp/
 .electron-builder-cache/
 .cache/
 .codex*

@@ -20,6 +20,8 @@ function createPreviewApi() {
   const ok = (data) => Promise.resolve({ ok: true, data });
   return {
     snapshot: () => ok(snapshot), chooseWorkspace: () => ok(snapshot.settings.workspace), switchWorkspace: (workspace) => { snapshot.settings.workspace=workspace; return ok(snapshot); }, updateAuthorizedRoots: (roots) => { snapshot.settings.authorizedRoots=roots; return ok(snapshot); }, closeSettings: () => ok(true),
+    storageStatus: () => ok({ channel: 'preview', currentRoot: 'C:\\Users\\示例用户\\AppData\\Local\\Mika\\profile', defaultRoot: 'C:\\Users\\示例用户\\AppData\\Local\\Mika\\profile', memoryRoot: 'C:\\Users\\示例用户\\AppData\\Local\\Mika\\profile\\memory-v1', locatorFile: '', error: '', canChange: false }),
+    storageChoose: () => ok(null), storagePlan: () => Promise.reject(new Error('静态预览模式不支持迁移存储目录')), storageApply: () => Promise.reject(new Error('静态预览模式不支持迁移存储目录')), storageOpen: () => ok(true),
     saveSettings: (patch) => { Object.assign(snapshot.settings, patch); return ok(snapshot.settings); },
     saveRuntimeKey: () => ok(snapshot.secrets), removeRuntimeKey: () => ok(snapshot.secrets), regenerateMcpToken: () => ok(snapshot.secrets),
     start: () => ok(snapshot), stop: () => ok(snapshot), restart: () => ok(snapshot),
@@ -99,6 +101,15 @@ const state = {
   skillSearch: '',
   selectedPromptCategory: '全部',
   isChatGptLoggedIn: false
+};
+
+const storageView = {
+  status: null,
+  loading: false,
+  busy: false,
+  restarting: false,
+  message: '',
+  error: ''
 };
 
 // 清除历史前端伪删除残留的脏数据，真理来源严格回归主进程 settings.json 与快照
@@ -3030,6 +3041,176 @@ async function refreshSnapshot(options = {}) {
     toast('状态检测失败', error.message, 'error');
     return null;
   }
+}
+
+function storageChannelLabel(channel) {
+  if (channel === 'production') return '正式版';
+  if (channel === 'development') return '开发版';
+  if (channel === 'preview') return '静态预览';
+  return channel ? String(channel) : '未知';
+}
+
+function formatStorageBytes(value) {
+  const bytes = Number(value);
+  if (!Number.isFinite(bytes) || bytes < 0) return '大小未知';
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let size = bytes / 1024;
+  let unit = units[0];
+  for (let index = 1; size >= 1024 && index < units.length; index += 1) {
+    size /= 1024;
+    unit = units[index];
+  }
+  return `${size >= 10 ? size.toFixed(1) : size.toFixed(2)} ${unit}`;
+}
+
+function storagePathsMatch(left, right) {
+  const normalize = (value) => String(value || '').trim().replace(/[\\/]+$/, '').toLocaleLowerCase();
+  return Boolean(normalize(left) && normalize(left) === normalize(right));
+}
+
+function renderStorageSettings() {
+  const status = storageView.status || {};
+  const locked = storageView.loading || storageView.busy || storageView.restarting;
+  const channel = $('#storageChannelValue');
+  const currentPath = $('#storageCurrentPath');
+  const defaultPath = $('#storageDefaultPath');
+  const memoryPath = $('#storageMemoryPath');
+  const message = $('#storageStatusMessage');
+  const openButton = $('#storageOpenBtn');
+  const changeButton = $('#storageChangeBtn');
+  const resetButton = $('#storageResetBtn');
+  // Reuse the existing main-process channel metadata; do not infer identity
+  // from the developer-mode maintenance toggle or from local UI preferences.
+  const loginToggle = $('#startWithWindowsToggle');
+  const loginHint = $('#startWithWindowsHint');
+  if (loginToggle) loginToggle.disabled = locked || status.channel !== 'production';
+  if (loginHint) loginHint.textContent = status.channel === 'production'
+    ? '登录 Windows 时启动已安装的正式版。'
+    : '仅正式版可设置；开发版不会修改系统开机启动项。';
+
+  if (channel) channel.textContent = storageView.loading && !storageView.status ? '正在读取…' : storageChannelLabel(status.channel);
+  if (currentPath) currentPath.textContent = status.currentRoot || '无法确认';
+  if (defaultPath) defaultPath.textContent = status.defaultRoot || '未提供';
+  if (memoryPath) memoryPath.textContent = status.memoryRoot || '未提供';
+  const locationKind = $('#storageLocationKind');
+  if (locationKind) locationKind.textContent = status.currentRoot && status.defaultRoot
+    ? (storagePathsMatch(status.currentRoot, status.defaultRoot) ? '默认位置' : '自定义位置') : '';
+  if (message) {
+    message.textContent = storageView.error || status.error || storageView.message || (storageView.loading ? '正在读取数据存储状态…' : storageView.status ? '' : '尚未读取到存储位置状态。');
+    message.hidden = !message.textContent;
+    message.setAttribute('data-error', String(Boolean(storageView.error || status.error)));
+    message.setAttribute('aria-live', 'polite');
+  }
+  if (openButton) openButton.disabled = locked || !status.currentRoot;
+  if (changeButton) changeButton.disabled = locked || status.canChange !== true;
+  if (resetButton) resetButton.disabled = locked || status.canChange !== true || storagePathsMatch(status.currentRoot, status.defaultRoot);
+}
+
+async function refreshStorageStatus() {
+  storageView.loading = true;
+  storageView.error = '';
+  storageView.message = '';
+  renderStorageSettings();
+  try {
+    if (typeof api.storageStatus !== 'function') throw new Error('当前版本不支持读取数据存储位置。');
+    const status = unwrap(await api.storageStatus());
+    if (!status || typeof status !== 'object') throw new Error('数据存储状态返回格式无效。');
+    storageView.status = status;
+    if (status.error) storageView.error = String(status.error);
+  } catch (error) {
+    storageView.status = null;
+    storageView.error = error?.message || String(error) || '读取数据存储位置失败。';
+  } finally {
+    storageView.loading = false;
+    renderStorageSettings();
+  }
+}
+
+async function runStorageSettingsAction(action) {
+  if (storageView.loading || storageView.busy || storageView.restarting) return;
+  storageView.busy = true;
+  storageView.error = '';
+  try {
+    await action();
+  } catch (error) {
+    storageView.error = error?.message || String(error) || '数据存储操作失败。';
+    toast('数据存储操作失败', storageView.error, 'error');
+  } finally {
+    storageView.busy = false;
+    renderStorageSettings();
+  }
+}
+
+async function planAndApplyStorageChange(target, restoringDefault = false) {
+  storageView.message = '正在检查目标目录和待迁移数据…';
+  renderStorageSettings();
+  const plan = unwrap(await api.storagePlan(target));
+  if (!plan || typeof plan.id !== 'string' || !plan.id) throw new Error('迁移计划无效，未执行切换。');
+
+  const isRestore = restoringDefault || plan.restoringDefault === true;
+  const source = plan.source || storageView.status?.currentRoot || '当前数据目录未知';
+  const destination = plan.target || (isRestore ? storageView.status?.defaultRoot : target) || '目标目录未知';
+  const files = Number(plan.files);
+  const fileDescription = Number.isFinite(files) && files >= 0 ? `${files} 个文件` : '文件数量未知';
+  const message = `将从 ${source} 复制到 ${destination}，预计迁移 ${fileDescription}，共 ${formatStorageBytes(plan.bytes)}。请先保存工作并停止正在运行的任务。确认后 Mika 将停止服务并自动重启；重启期间在会话恢复前复制并校验数据，成功后使用新目录，失败则继续使用原目录并提示。原目录会保留。恢复默认时，如默认位置已有内容，会将其改名为同级备份并保留。`;
+  storageView.message = '迁移方案已准备，等待确认…';
+  renderStorageSettings();
+  const confirmed = await showModernConfirm({
+    title: isRestore ? '恢复默认数据位置' : '更改数据存储位置',
+    message,
+    confirmText: isRestore ? '迁移并恢复默认' : '复制并切换',
+    cancelText: '取消',
+    danger: false
+  });
+  if (!confirmed) {
+    storageView.message = '已取消，当前数据位置未更改。';
+    return;
+  }
+
+  storageView.message = '正在停止服务并准备重启迁移…';
+  renderStorageSettings();
+  const result = unwrap(await api.storageApply(plan.id));
+  if (result?.restarting !== true) throw new Error('后台未确认重启已排队，数据位置可能尚未切换。');
+  storageView.restarting = true;
+  storageView.message = '迁移已排队，Mika 正在重启；启动后会复制并校验数据。';
+  toast('迁移已排队', 'Mika 正在重启；复制校验完成后才会使用新目录。', 'info');
+}
+
+async function handleOpenStorageDirectory() {
+  if (storageView.loading || storageView.busy || storageView.restarting || !storageView.status?.currentRoot) return;
+  await runStorageSettingsAction(async () => {
+    storageView.message = '正在打开数据目录…';
+    renderStorageSettings();
+    unwrap(await api.storageOpen());
+    storageView.message = '已在文件资源管理器中打开当前数据目录。';
+  });
+}
+
+async function handleChooseStorageDirectory() {
+  if (storageView.status?.canChange !== true) return;
+  await runStorageSettingsAction(async () => {
+    storageView.message = '请选择新的数据目录…';
+    renderStorageSettings();
+    const choice = unwrap(await api.storageChoose());
+    if (!choice) {
+      storageView.message = '已取消选择，当前数据位置未更改。';
+      return;
+    }
+    if (typeof choice.target !== 'string' || !choice.target.trim()) throw new Error('未取得有效的目标目录。');
+    await planAndApplyStorageChange(choice.target, false);
+  });
+}
+
+async function handleRestoreDefaultStorage() {
+  if (storageView.status?.canChange !== true) return;
+  await runStorageSettingsAction(async () => planAndApplyStorageChange(null, true));
+}
+
+function bindStorageSettingsEvents() {
+  $('#storageOpenBtn')?.addEventListener('click', handleOpenStorageDirectory);
+  $('#storageChangeBtn')?.addEventListener('click', handleChooseStorageDirectory);
+  $('#storageResetBtn')?.addEventListener('click', handleRestoreDefaultStorage);
 }
 
 function collectSettings() {
@@ -6208,7 +6389,7 @@ const MEMORY_MODE_LABELS = { off: '关闭自动记录', suggest: '提示我确�
 const memoryView = {
   wired: false, enabled: false, config: {}, memories: [], candidates: [],
   scope: '', archived: false, query: '', draft: false, editingId: '', timer: 0,
-  handledCandidateIds: new Set()
+  handledCandidateIds: new Set(), refreshError: ''
 };
 
 function memoryConfigOf(payload) {
@@ -6349,9 +6530,9 @@ function syncMemoryVisuals() {
   }
 
   const enabledState = $('#memoryEnabledState');
-  if (enabledState) enabledState.textContent = enabled ? '已启用' : '关闭';
+  if (enabledState) enabledState.textContent = memoryView.refreshError ? '状态未更新' : (enabled ? '已启用' : '关闭');
   const personalState = $('#memoryPersonalState');
-  if (personalState) personalState.textContent = personalOn ? '已开启' : '关闭';
+  if (personalState) personalState.textContent = memoryView.refreshError ? '状态未更新' : (personalOn ? '已开启' : '关闭');
 
   const badge = $('#memoryCountBadge');
   if (badge) {
@@ -6364,38 +6545,46 @@ function syncMemoryVisuals() {
     }
   }
 
+  syncMemoryDirectoryVisuals();
+}
+
+function syncMemoryDirectoryVisuals() {
+  const config = memoryView.config || {};
+  const resolvedRoot = !memoryView.refreshError && typeof config.root === 'string' ? config.root.trim() : '';
+  const hasFiles = !memoryView.refreshError && Boolean(config.exists || (memoryView.memories || []).length);
+  const canOpen = Boolean(resolvedRoot && hasFiles);
   const root = $('#memoryRootPath');
-  const ws = String(state.snapshot?.settings?.workspace || state.selectedWorkspace || '').trim();
   const openFolderBtn = $('#memoryOpenFolderBtn');
   const exportBtn = $('#memoryExportBtn');
+  if (root) root.textContent = memoryView.refreshError ? '记忆刷新失败，旧状态已过期，请重试' : (resolvedRoot ? `记忆存储路径：${resolvedRoot}` : '记忆目录尚未获取，请确认本地 Runtime 已就绪');
+  const pathText = $('#memoryPathText');
+  if (pathText) pathText.textContent = resolvedRoot ? `本地目录：${resolvedRoot}` : '本地目录：尚未获取';
+  if (openFolderBtn) {
+    openFolderBtn.disabled = !canOpen;
+    openFolderBtn.title = canOpen ? '在系统资源管理器中打开记忆目录' : '当前暂无可打开的记忆目录';
+  }
+  if (exportBtn) {
+    exportBtn.disabled = !hasFiles;
+    exportBtn.title = hasFiles ? '导出记忆备份压缩包' : '当前暂无记忆文件，无法导出';
+  }
+  for (const selector of ['#memoryPathPill', '#memoryPathChip']) {
+    const element = $(selector);
+    if (!element) continue;
+    element.title = canOpen ? `点击在资源管理器中打开此文件夹：${resolvedRoot}` : (resolvedRoot ? `完整路径：${resolvedRoot}（尚未创建记忆文件）` : '记忆目录尚未获取');
+    element.style.cursor = canOpen ? 'pointer' : 'default';
+    element.setAttribute('aria-disabled', String(!canOpen));
+    element.onclick = canOpen ? handleOpenMemoryFolder : null;
+  }
+}
 
-  if (!ws) {
-    if (root) root.textContent = '未选择工作区（请先在总览页设置本地代码目录）';
-    if (openFolderBtn) {
-      openFolderBtn.disabled = true;
-      openFolderBtn.title = '未选择工作区，暂无目录可打开';
-    }
-    if (exportBtn) {
-      exportBtn.disabled = true;
-      exportBtn.title = '未选择工作区，暂无可导出数据';
-    }
-  } else {
-    const defaultRoot = `${ws.replace(/[\\/]+$/, '')}\\.coding-tools\\memory`;
-    const resolvedRoot = config.root && config.root.toLowerCase().startsWith(ws.toLowerCase()) ? config.root : defaultRoot;
-    const hasMemories = (memoryView.memories || []).length > 0;
-    const hasFiles = Boolean(config.exists || hasMemories);
-
-    if (root) {
-      root.textContent = enabled || hasFiles ? `记忆存储路径：${resolvedRoot}` : '记忆尚未启用（启用后将在本地工作区创建 Markdown 目录）';
-    }
-    if (openFolderBtn) {
-      openFolderBtn.disabled = !hasFiles;
-      openFolderBtn.title = hasFiles ? '在系统资源管理器中打开记忆目录' : '当前暂无记忆文件，无需打开目录';
-    }
-    if (exportBtn) {
-      exportBtn.disabled = !hasFiles;
-      exportBtn.title = hasFiles ? '导出记忆备份压缩包' : '当前暂无记忆文件，无法导出';
-    }
+async function handleOpenMemoryFolder() {
+  if (memoryView.refreshError) return;
+  try {
+    if (!api.openMemoryFolder) throw new Error('当前环境不支持打开本地目录。');
+    const result = unwrap(await api.openMemoryFolder());
+    if (result?.root) toast('已打开记忆目录', result.root, 'success');
+  } catch (error) {
+    toast('无法打开目录', error.message, 'warn');
   }
 }
 
@@ -6558,28 +6747,7 @@ function initMemoryPage() {
     const create = $('#memoryCreateBtn');
     if (create) create.addEventListener('click', () => { memoryView.draft = true; memoryView.editingId = ''; renderMemoryList(); });
     const openFolder = $('#memoryOpenFolderBtn');
-    if (openFolder) openFolder.addEventListener('click', async () => {
-      const ws = String(state.snapshot?.settings?.workspace || state.selectedWorkspace || '').trim();
-      if (!ws) {
-        toast('暂无记忆目录', '未选择工作区，请先在总览页设置本地代码目录', 'warn');
-        return;
-      }
-      const hasMemories = (memoryView.memories || []).length > 0;
-      if (!memoryView.enabled && !memoryView.config?.exists && !hasMemories) {
-        toast('暂无记忆文件', '记忆尚未启用，暂无可打开的本地文件', 'warn');
-        return;
-      }
-      try {
-        if (api.openMemoryFolder) {
-          const res = unwrap(await api.openMemoryFolder());
-          if (res?.root) {
-            toast('已打开记忆目录', res.root, 'success');
-          }
-        }
-      } catch (err) {
-        toast('无法打开目录', err.message, 'warn');
-      }
-    });
+    if (openFolder) openFolder.addEventListener('click', handleOpenMemoryFolder);
     const exportBtn = $('#memoryExportBtn');
     if (exportBtn) exportBtn.addEventListener('click', handleMemoryExport);
     const importBtn = $('#memoryImportBtn');
@@ -6602,19 +6770,22 @@ async function refreshMemory() {
     const [configResult, listResult, candidateResult] = await Promise.all([
       api.memoryConfig(), listRequest, api.memoryCandidates()
     ]);
+    // Validate every response before replacing any part of the previous snapshot.
     const configPayload = unwrap(configResult);
-    if (configPayload && typeof configPayload === 'object') {
-      memoryView.config = memoryConfigOf(configPayload);
-      memoryView.enabled = memoryEnabledOf(configPayload);
-      memoryView.memories = memoryRecordsOf(unwrap(listResult), 'memories');
-      const fetchedCandidates = memoryRecordsOf(unwrap(candidateResult), 'candidates');
-      memoryView.candidates = fetchedCandidates.filter((c) => !memoryView.handledCandidateIds.has(c.candidate_id));
+    const listPayload = unwrap(listResult);
+    const candidatePayload = unwrap(candidateResult);
+    if (!configPayload || typeof configPayload !== 'object' || configPayload.ok === false || listPayload?.ok === false || candidatePayload?.ok === false) {
+      throw new Error('Runtime 返回了无效的记忆数据。');
     }
+    memoryView.config = memoryConfigOf(configPayload);
+    memoryView.enabled = memoryEnabledOf(configPayload);
+    memoryView.memories = memoryRecordsOf(listPayload, 'memories');
+    const fetchedCandidates = memoryRecordsOf(candidatePayload, 'candidates');
+    memoryView.candidates = fetchedCandidates.filter((c) => !memoryView.handledCandidateIds.has(c.candidate_id));
+    memoryView.refreshError = '';
   } catch (error) {
-    if (!memoryView.config) memoryView.config = {};
-    // 严格遵循科学严谨性与真实性，绝不注入虚假的 Mock Demo 数据
-    memoryView.memories = memoryView.memories || [];
-    memoryView.candidates = memoryView.candidates || [];
+    // Keep unsaved drafts and the old snapshot, but do not present it as current.
+    memoryView.refreshError = memoryErrorText(error);
   }
   renderMemorySwitches();
   renderMemoryCandidates();
@@ -6648,46 +6819,24 @@ function renderMemorySwitches() {
       opt.setAttribute('aria-selected', String(isSel));
     });
   }
-  const ws = state.snapshot?.settings?.workspace || 'D:\\Lenovo\\Documents\\Mika-Repository';
-  const defaultRoot = `${ws.replace(/[\\/]+$/, '')}\\.coding-tools\\memory`;
-  const resolvedRoot = config.root || defaultRoot;
-
-  const pathText = $('#memoryPathText');
-  const pathPill = $('#memoryPathPill');
-  if (pathText) {
-    pathText.textContent = '本地目录：.coding-tools/memory';
-  }
-  if (pathPill) {
-    pathPill.title = `完整路径：${resolvedRoot}（点击可直接在资源管理器中打开）`;
-    pathPill.onclick = () => {
-      if (api.openMemoryFolder) {
-        api.openMemoryFolder().catch(() => {});
-      }
-    };
-  }
-
-  const root = $('#memoryRootPath');
-  const chip = $('#memoryPathChip');
-  if (root) {
-    root.textContent = enabled || config.exists ? `记忆存储路径：${resolvedRoot}` : '记忆尚未启用（启用后将在本地工作区创建 Markdown 目录）';
-  }
-  if (chip) {
-    chip.style.cursor = 'pointer';
-    chip.title = `点击在资源管理器中打开此文件夹：${resolvedRoot}`;
-    chip.onclick = () => {
-      if (api.openMemoryFolder) {
-        api.openMemoryFolder().catch(() => {});
-      }
-    };
-  }
-
   const badge = $('#memoryCountBadge');
   if (badge) {
     badge.classList.toggle('is-disabled', !enabled);
     if (badge.lastElementChild) {
       const active = memoryView.memories.filter((item) => !item.archived).length;
-      badge.lastElementChild.textContent = enabled ? `已记住 ${active} 条 · ${MEMORY_MODE_LABELS[String(config.auto_memory)] || '提示我确认（推荐）'}` : '未启用';
+      badge.lastElementChild.textContent = memoryView.refreshError ? '刷新失败 · 状态已过期' : (enabled ? `已记住 ${active} 条 · ${MEMORY_MODE_LABELS[String(config.auto_memory)] || '提示我确认（推荐）'}` : '未启用');
     }
+  }
+  for (const selector of ['#memoryEnabledToggle', '#memoryPersonalToggle', '#memoryModeSelect', '#memoryModeSelectTrigger', '#memoryCreateBtn', '#memoryImportBtn']) {
+    const control = $(selector);
+    if (control) control.disabled = Boolean(memoryView.refreshError);
+  }
+  if (memoryView.refreshError) {
+    const dropdown = $('#memoryModeDropdownMenu');
+    if (dropdown) dropdown.hidden = true;
+    const trigger = $('#memoryModeSelectTrigger');
+    trigger?.classList.remove('is-open');
+    trigger?.setAttribute('aria-expanded', 'false');
   }
 }
 
@@ -6727,7 +6876,7 @@ function renderMemoryCandidates() {
   const section = $('#memoryCandidatesSection');
   const container = $('#memoryCandidateList');
   const badge = $('#memoryCandidateCount');
-  const list = memoryView.candidates || [];
+  const list = memoryView.refreshError ? [] : (memoryView.candidates || []);
   if (badge && badge.lastElementChild) badge.lastElementChild.textContent = `${list.length} 条`;
   if (!section) return;
 
@@ -6881,6 +7030,12 @@ function memoryDraftMarkup() {
 function renderMemoryList() {
   const container = $('#memoryListContainer');
   if (!container) return;
+  if (memoryView.refreshError) {
+    container.innerHTML = memoryEmptyCard('记忆刷新失败，旧状态已过期', memoryView.refreshError)
+      + '<button type="button" class="secondary-button btn-sm" id="memoryRetryBtn">重新加载</button>';
+    container.querySelector('#memoryRetryBtn')?.addEventListener('click', refreshMemory);
+    return;
+  }
 
   // 纯前端本地 0ms 即时过滤：支持范围筛选、归档状态、关键字模糊匹配，绝不依赖网络请求延迟，永不卡顿
   const scopeFilter = String(memoryView.scope || '').trim();
@@ -7127,6 +7282,7 @@ async function handleMemoryCandidateClick(event) {
 }
 
 async function handleMemoryExport() {
+  if (memoryView.refreshError) return;
   const activeCount = (memoryView.memories || []).length;
   if (!memoryView.enabled && activeCount === 0) {
     toast('暂无记忆数据', '当前尚未启用长期记忆，本地暂无可导出的记忆文件。', 'warn');
@@ -7812,6 +7968,8 @@ function bindSkillAndPromptEvents() {
 async function initialize() {
   try {
     bindEvents();
+    bindStorageSettingsEvents();
+    void refreshStorageStatus();
     syncThemeCards(document.body.dataset.theme || 'dark');
     switchSettingsTab('general');
     switchGuideStep(1);

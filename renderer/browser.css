@@ -80,6 +80,8 @@ button:focus-visible{outline:2px solid rgba(0,0,0,.15);outline-offset:1px}
  * 自绘按钮是 fixed 定位的独立层（见下方 .window-controls），不在本容器内，
  * 所以这里必须留出等宽内边距，否则最右侧的控件会被按钮压住。 */
 .toolbar-main{position:relative;display:flex;grid-template-columns:auto 1fr auto;align-items:center;width:100%;height:100%;padding:0 146px 0 22px;-webkit-app-region:drag}
+/* 顶栏文字不作为可选文本或浏览器拖放内容；空白仍用于移动窗口。 */
+.browser-toolbar,.browser-toolbar *{user-select:none;-webkit-user-select:none;-webkit-user-drag:none}
 
 /* ── 自绘窗口按钮（第 44 轮）──────────────────────────────────────────────
  * 为什么自绘：原生 titleBarOverlay 的三颗按钮由 Windows/DWM 在**独立合成路径**
@@ -120,10 +122,7 @@ button:focus-visible{outline:2px solid rgba(0,0,0,.15);outline-offset:1px}
 .workspace-menu,
 .workspace-menu-item,
 .workspace-menu-manage-btn,
-.toolbar-left,
-.toolbar-center,
 .workspace-bar,
-.toolbar-right,
 .service-state,
 .health-pill,
 .task-strip,
@@ -470,16 +469,18 @@ button *,
 .add-workspace{display:inline-flex;align-items:center;border-radius:var(--radius-md);font-size:var(--fs-sm);background:rgba(0,0,0,.03);color:var(--control-text)}
 
 /* ── 右侧区域：服务状态 + 运行状态 + 设置（systemArea）─────────────────────── */
-.toolbar-right{margin-left:auto;display:flex;align-items:center;gap:12px;flex:0 0 auto;justify-content:flex-end;white-space:nowrap}
+.toolbar-right{margin-left:auto;display:flex;align-items:center;gap:12px;flex:1 1 0;min-width:0;justify-content:flex-end;white-space:nowrap}
+.toolbar-left,.toolbar-center,.toolbar-right{-webkit-app-region:drag}
+.toolbar-right > :not(.page-state){flex-shrink:0}
 .toolbar-right .toolbar-divider{width:1px;height:22px;background:var(--border);margin:0 2px;flex:0 0 1px}
 
 /* 兼容断言测试的辅助隐藏节点规则 */
 .app-name{display:none;white-space:nowrap}
 
 /* 页面加载中 / 加载失败提示 */
-.page-state{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:var(--fs-xs);white-space:nowrap;pointer-events:none;user-select:none}
+.page-state{display:flex;align-items:center;gap:6px;flex:0 1 auto;min-width:0;max-width:240px;overflow:hidden;color:var(--muted);font-size:var(--fs-xs);white-space:nowrap;user-select:none}
 .page-state[hidden]{display:none !important}
-.page-state span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.page-state span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .page-state i{width:7px;height:7px;flex:0 0 7px;border-radius:50%;background:var(--dot)}
 .page-state.loading i{border:2px solid #d6d8dc;border-top-color:var(--control-text);background:transparent;animation:spin .75s linear infinite}
 .page-state.ready i{background:var(--green)}

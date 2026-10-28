@@ -1,3 +1,10 @@
+if (require('./services/storageBootstrap').shouldBootstrap()) {
+  require('./services/storageBootstrap').runBootstrap().catch((error) => {
+    const { app, dialog } = require('electron');
+    dialog.showErrorBox('数据目录恢复无法启动', error.message);
+    app.exit(1);
+  });
+} else {
 process.on('uncaughtException', (err) => {
   console.error('>>> [Electron 致命未捕获异常 uncaughtException]:', err);
 });
@@ -9,7 +16,24 @@ const path = require('node:path');
 const fs = require('node:fs/promises');
 const fsSync = require('node:fs');
 const crypto = require('node:crypto');
-const { app, BrowserWindow, WebContentsView, dialog, ipcMain, shell, Tray, Menu, nativeImage, session, Notification, nativeTheme, clipboard } = require('electron');
+const { app, BrowserWindow, WebContentsView, dialog, ipcMain, shell, Tray, Menu, nativeImage, session, Notification, nativeTheme, clipboard, screen } = require('electron');
+const { fitPopupBounds } = require('./services/popupBounds');
+const { configureDataDirectories, getProductionStorage } = require('./services/dataDirectoryService');
+try {
+  configureDataDirectories(app);
+} catch (error) {
+  console.error(error.message);
+  dialog.showErrorBox('数据目录初始化失败', error.message);
+  app.exit(1);
+  process.exit(1);
+}
+// Choose the profile and acquire its lock before any settings or secret writes.
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  console.warn('>>> [Mika-MCP] 检测到后台已有运行中的应用实例，已尝试呼出已有窗口，当前新进程退出。');
+  app.quit();
+  process.exit(0);
+}
 const { autoUpdater } = require('electron-updater');
 const { SettingsStore } = require('./services/settingsStore');
 const { SkillStore } = require('./services/skillStore');
@@ -23,6 +47,7 @@ const { run } = require('./services/commandRunner');
 const { resolveProxy, clearProxyCache } = require('./services/proxyService');
 const { BuildVerificationService } = require('./services/buildVerificationService');
 const { HealthService } = require('./services/healthService');
+const { serviceHealthState } = require('./services/serviceHealthState');
 const { readJson, writeJsonAtomic } = require('./services/jsonStore');
 const { LocalMcpClient } = require('./services/localMcpClient');
 const {
@@ -50,13 +75,14 @@ let activeSurface = 'chat';
 let chatController;
 let orchestrator;
 let forceQuit = false;
+let storageRestarting = false;
 let tray = null;
 let buildVerification;
 let healthService;
 let taskNotificationService;
 let sharedLocalMcpClient = null;
 let isDirectoryDialogOpen = false;
-const settings = new SettingsStore();
+const settings = new SettingsStore({ development: !app.isPackaged });
 const skillStore = new SkillStore();
 const promptStore = new PromptStore();
 const secrets = new SecretStore();
@@ -370,6 +396,7 @@ function assertTrustedIpc(event) {
 function secureHandle(channel, handler) {
   ipcMain.handle(channel, (event, ...args) => {
     assertTrustedIpc(event);
+    if (storageRestarting && channel !== 'storage:status') return { ok: false, error: '正在准备数据迁移并重启，请勿进行其他操作。' };
     return handler(event, ...args);
   });
 }
@@ -610,6 +637,9 @@ function createChatWindow() {
     toolbarHeight: CHAT_TOOLBAR_HEIGHT,
     onState: (payload) => {
       if (chatWindow && !chatWindow.isDestroyed()) chatWindow.webContents.send('chat:state', payload);
+      if (healthDropdownWindow && !healthDropdownWindow.isDestroyed()) {
+        healthDropdownWindow.webContents.send('service-health:data', { chatState: payload });
+      }
     },
     onDownload: (payload) => {
       if (chatWindow && !chatWindow.isDestroyed()) chatWindow.webContents.send('chat:download', payload);
@@ -836,7 +866,7 @@ function syncWorkspaceDropdownData() {
 // ── 服务健康详情浮层窗口（独立透明浮层，杜绝WebContentsView遮盖、溢出与层叠） ──
 let healthDropdownWindow = null;
 const HEALTH_DROPDOWN_WIDTH = 520;
-const HEALTH_DROPDOWN_HEIGHT = 316;
+const HEALTH_DROPDOWN_HEIGHT = 430;
 
 function hideHealthDropdown() {
   if (healthDropdownWindow && !healthDropdownWindow.isDestroyed()) {
@@ -886,30 +916,32 @@ function ensureHealthDropdownWindow() {
   return healthDropdownWindow;
 }
 
+function healthDropdownPayload(status) {
+  return { ...serviceHealthState(status), chatState: chatController?.getState() || null,
+    theme: settings.load().theme, statusError: '' };
+}
+
+function reportHealthDropdownError(error) {
+  if (healthDropdownWindow && !healthDropdownWindow.isDestroyed()) {
+    healthDropdownWindow.webContents.send('service-health:data', {
+      mcpRunning: null, tunnelRunning: null, statusError: safeMessage(error)
+    });
+  }
+}
+
 function syncHealthDropdownData() {
   if (!healthDropdownWindow || healthDropdownWindow.isDestroyed()) return;
   try {
-    const current = settings.load();
     const snap = orchestrator?.latestSnapshot || null;
-    const mcpRunning = Boolean(snap?.status?.runtimeRunning || snap?.status?.mcpRunning);
-    const tunnelRunning = Boolean(snap?.status?.tunnelRunning || snap?.status?.connectionRunning);
-    healthDropdownWindow.webContents.send('service-health:data', {
-      mcpRunning,
-      tunnelRunning,
-      theme: current.theme
-    });
+    healthDropdownWindow.webContents.send('service-health:data', healthDropdownPayload(snap?.status));
 
     // 后台静默刷新一次最新轻量快照，确保数据 100% 鲜活且绝不卡顿主线程
     orchestrator?.lightweightSnapshot?.().then((latest) => {
       if (healthDropdownWindow && !healthDropdownWindow.isDestroyed()) {
-        healthDropdownWindow.webContents.send('service-health:data', {
-          mcpRunning: Boolean(latest?.status?.mcpRunning),
-          tunnelRunning: Boolean(latest?.status?.tunnelRunning),
-          theme: settings.load().theme
-        });
+        healthDropdownWindow.webContents.send('service-health:data', healthDropdownPayload(latest?.status));
       }
-    }).catch(() => {});
-  } catch (_) {}
+    }).catch(reportHealthDropdownError);
+  } catch (error) { reportHealthDropdownError(error); }
 }
 
 /* 原 openManagerWindow() 在此删除。
@@ -931,6 +963,54 @@ function registerIpc() {
    * emitStatus → 'runtime:status-changed'，不经过 IPC，
    * 首屏版本号会一直空着，要手动 refresh 才有值。 */
   secureHandle('app:snapshot', (_event, options) => invokeSafely(() => orchestrator.snapshot(options || {})));
+  secureHandle('storage:status', () => invokeSafely(() => {
+    const service = getProductionStorage();
+    return service ? service.status() : { channel: 'development', currentRoot: app.getPath('userData'),
+      defaultRoot: app.getPath('userData'), memoryRoot: process.env.CODING_TOOLS_MCP_MEMORY_ROOT,
+      locatorFile: '', error: '', canChange: false };
+  }));
+  secureHandle('storage:open', () => invokeSafely(async () => {
+    const failure = await shell.openPath(app.getPath('userData'));
+    if (failure) throw new Error(failure);
+    return true;
+  }));
+  secureHandle('storage:choose', () => invokeSafely(async () => {
+    if (!getProductionStorage()) throw new Error('开发版不迁移正式数据目录。');
+    const result = await dialog.showOpenDialog(BrowserWindow.getFocusedWindow() || chatWindow, {
+      title: '选择新的数据存储目录（空目录）', properties: ['openDirectory', 'createDirectory']
+    });
+    return result.canceled ? null : { target: result.filePaths[0] };
+  }));
+  secureHandle('storage:plan', (_event, target) => invokeSafely(() => {
+    const service = getProductionStorage();
+    if (!service) throw new Error('开发版不迁移正式数据目录。');
+    return service.planAsync(target);
+  }));
+  secureHandle('storage:apply', (_event, id) => invokeSafely(async () => {
+    const service = getProductionStorage();
+    if (!service) throw new Error('开发版不迁移正式数据目录。');
+    if (orchestrator.busy || orchestrator.recovering) throw new Error('服务操作尚未结束，请稍后重试。');
+    service.validatePlan(id);
+    storageRestarting = true;
+    try {
+      await orchestrator.stop();
+      // stop() tolerates native-stop failures for normal use; migration must not.
+      await orchestrator.native.stop();
+      service.assertStopped();
+      taskNotificationService?.stop();
+      for (const currentSession of [session.defaultSession, session.fromPartition('persist:chatgpt-session')]) {
+        await currentSession.cookies.flushStore();
+        currentSession.flushStorageData();
+      }
+      service.queue(id);
+      setTimeout(() => { forceQuit = true; app.relaunch(); app.quit(); }, 300);
+      return { restarting: true };
+    } catch (error) {
+      storageRestarting = false;
+      taskNotificationService?.start();
+      throw error;
+    }
+  }));
   secureHandle('app:lightweight-snapshot', () => invokeSafely(() => orchestrator.lightweightSnapshot()));
   secureHandle('app:check-for-updates', () => invokeSafely(() => checkForUpdatesManually()));
   secureHandle('workspace:hub', () => invokeSafely(async () => { const current = settings.load(); return { activeWorkspace: current.workspace, recentWorkspaces: current.recentWorkspaces || [] }; }));
@@ -1115,22 +1195,11 @@ function registerIpc() {
   secureHandle('memory:restore-revision', (_event, payload = {}) => invokeSafely(() => callLocalMcpTool('memory_control', memoryRestoreRevisionArgs(payload))));
   secureHandle('memory:rebuild-index', () => invokeSafely(() => callLocalMcpTool('memory_control', { action: 'rebuild_index' })));
   secureHandle('memory:open-folder', () => invokeSafely(async () => {
-    const currentWs = String(settings.load().workspace || '').trim();
-    if (!currentWs) {
-      throw new Error('未设置当前工作区，暂无记忆目录可供打开。');
-    }
-    const memDir = path.join(currentWs, '.coding-tools', 'memory');
-    if (!fsSync.existsSync(memDir)) {
-      throw new Error('当前暂无记忆文件，本地尚未创建记忆目录。');
-    }
-    const entries = await fs.readdir(memDir).catch(() => []);
-    const validFiles = entries.filter((name) => !name.startsWith('.') && name !== '__pycache__');
-    if (validFiles.length === 0) {
-      throw new Error('记忆目录为空，暂无可查看的记忆文件。');
-    }
-    const failure = await shell.openPath(memDir);
-    if (failure) throw new Error(`打开记忆文件夹失败：${failure}`);
-    return { opened: true, root: memDir };
+    const { openMemoryDirectory } = require('./services/memoryDirectoryService');
+    return openMemoryDirectory({
+      readConfig: () => callLocalMcpTool('memory_control', { action: 'config' }),
+      openPath: (root) => shell.openPath(root)
+    });
   }));
   secureHandle('notification:test', () => invokeSafely(() => taskNotificationService?.testNotification() ?? false));
   secureHandle('notification:play-beep', () => invokeSafely(async () => {
@@ -1247,12 +1316,13 @@ function registerIpc() {
     const win = ensureWorkspaceDropdownWindow();
     const current = settings.load();
     const winBounds = chatWindow.getContentBounds();
-    const winW = WORKSPACE_DROPDOWN_WIDTH;
-    const x = Math.round(winBounds.x + Number(rect?.x || 0) - 8);
-    const y = Math.round(winBounds.y + Number(rect?.y || 0) - 2);
+    const anchor = { x: Math.round(winBounds.x + Number(rect?.x || 0)),
+      y: Math.round(winBounds.y + Number(rect?.y || 0)), width: Math.max(1, Math.round(Number(rect?.width || 1))), height: Math.max(1, Math.round(Number(rect?.height || 1))) };
 
     const recentCount = Array.isArray(current.recentWorkspaces) ? current.recentWorkspaces.length : 0;
-    const targetH = cachedWorkspaceDropdownHeight || estimateWorkspaceDropdownHeight(recentCount);
+    const fitted = fitPopupBounds({ x: anchor.x - 8, y: anchor.y - 2, width: WORKSPACE_DROPDOWN_WIDTH,
+      height: cachedWorkspaceDropdownHeight || estimateWorkspaceDropdownHeight(recentCount) }, screen.getDisplayMatching(anchor).workArea);
+    const { x, y, width: winW, height: targetH } = fitted;
 
     // 1. 原子调整位置与准确高度（如已贴合则不重复触发 Win32 重绘）
     const curBounds = win.getBounds();
@@ -1357,18 +1427,19 @@ function registerIpc() {
 
     const win = ensureHealthDropdownWindow();
     const winBounds = chatWindow.getContentBounds();
-    const winW = HEALTH_DROPDOWN_WIDTH;
-    const targetH = HEALTH_DROPDOWN_HEIGHT;
+    const anchor = { x: Math.round(winBounds.x + Number(rect?.x || 0)),
+      y: Math.round(winBounds.y + Number(rect?.y || 0)), width: Math.max(1, Math.round(Number(rect?.width || 1))), height: Math.max(1, Math.round(Number(rect?.height || 1))) };
 
     // 定位算法：右对齐到胶囊按钮右端并保留微呼吸边距
-    let x = Math.round(winBounds.x + Number(rect?.x || 0) + Number(rect?.width || 0) - winW);
+    let desiredX = anchor.x + anchor.width - HEALTH_DROPDOWN_WIDTH;
     // 严格防溢出保护：确保不超出主窗口左右边界
     const minX = winBounds.x + 12;
-    const maxX = winBounds.x + winBounds.width - winW - 12;
-    x = Math.max(minX, Math.min(maxX, x));
+    const maxX = winBounds.x + winBounds.width - HEALTH_DROPDOWN_WIDTH - 12;
+    desiredX = Math.max(minX, Math.min(maxX, desiredX));
 
     // 纵向定位：紧贴胶囊按钮下沿并留出 5px 缝隙，绝不与顶栏遮叠
-    const y = Math.round(winBounds.y + Number(rect?.y || 0) + Number(rect?.height || 0) + 5);
+    const { x, y, width: winW, height: targetH } = fitPopupBounds({ x: desiredX,
+      y: anchor.y + anchor.height + 5, width: HEALTH_DROPDOWN_WIDTH, height: HEALTH_DROPDOWN_HEIGHT }, screen.getDisplayMatching(anchor).workArea);
 
     // 关键防频闪：如果坐标与尺寸完全一致，绝不在 Windows 上重复调用 setBounds（避免 DWM 透明层重建白屏闪烁）
     const curBounds = win.getBounds();
@@ -1389,13 +1460,8 @@ function registerIpc() {
   })));
 
   secureHandle('service-health:get-data', () => invokeSafely(async () => {
-    const snap = orchestrator?.latestSnapshot || null;
-    const current = settings.load();
-    return {
-      mcpRunning: Boolean(snap?.status?.runtimeRunning || snap?.status?.mcpRunning),
-      tunnelRunning: Boolean(snap?.status?.tunnelRunning || snap?.status?.connectionRunning),
-      theme: current.theme
-    };
+    const snap = await orchestrator?.lightweightSnapshot?.();
+    return healthDropdownPayload(snap?.status);
   }));
 
   secureHandle('service-health:height', () => invokeSafely(async () => {
@@ -1533,6 +1599,8 @@ function registerIpc() {
   secureHandle('settings:save', (_event, patch) => invokeSafely(async () => {
     const allowed = ['workspace', 'permissionMode', 'mcpPort', 'healthPort', 'proxyMode', 'proxyUrl', 'tunnelId', 'startWithWindows', 'autoStartServices', 'keepRunningOnClose', 'closeAction', 'showTrayIcon', 'progressReportSeconds', 'taskNotifications', 'taskNotificationSound', 'theme', 'developerMode', 'guideProgress', 'firstRunCompleted', 'bridgeRemovedNotice', 'recentWorkspaces', 'customAccentColor', 'customTone'];
     const clean = Object.fromEntries(Object.entries(patch || {}).filter(([key]) => allowed.includes(key)));
+    // Development settings must never control the installed app's login entry.
+    if (!app.isPackaged) delete clean.startWithWindows;
     // 通道 ID 属敏感凭据，统一使用 Windows DPAPI 加密存入 SecretStore，防止明文落盘 settings.json
     if (Object.hasOwn(clean, 'tunnelId')) {
       const targetTunnelId = String(clean.tunnelId || '').trim();
@@ -1547,7 +1615,7 @@ function registerIpc() {
     const saved = settings.save(clean);
     // 内存中带回解密后的 tunnelId 供渲染层继续响应与使用
     saved.tunnelId = secrets.get('tunnelId');
-    if (Object.hasOwn(clean, 'startWithWindows') && Boolean(clean.startWithWindows) !== Boolean(prev.startWithWindows)) {
+    if (app.isPackaged && Object.hasOwn(clean, 'startWithWindows') && Boolean(clean.startWithWindows) !== Boolean(prev.startWithWindows)) {
       app.setLoginItemSettings({ openAtLogin: Boolean(saved.startWithWindows), path: process.execPath });
     }
     if (Object.hasOwn(clean, 'showTrayIcon') && Boolean(clean.showTrayIcon) !== Boolean(prev.showTrayIcon)) {
@@ -1686,16 +1754,13 @@ function registerIpc() {
   }));
 }
 
-const hasSingleInstanceLock = app.requestSingleInstanceLock();
-if (!hasSingleInstanceLock) {
-  console.warn('>>> [Mika-MCP] 检测到后台已有运行中的应用实例，已尝试呼出已有窗口，当前新进程退出。');
-  app.quit();
-  process.exit(0);
-} else {
+if (hasSingleInstanceLock) {
   app.on('second-instance', () => showChatWindow());
 
   app.whenReady().then(async () => {
-  app.setLoginItemSettings({ openAtLogin: Boolean(settings.load().startWithWindows), path: process.execPath });
+  if (app.isPackaged) {
+    app.setLoginItemSettings({ openAtLogin: Boolean(settings.load().startWithWindows), path: process.execPath });
+  }
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
   session.defaultSession.setPermissionCheckHandler(() => false);
   app.on('web-contents-created', (_event, contents) => {
@@ -1776,13 +1841,9 @@ if (!hasSingleInstanceLock) {
     sendManager('runtime:heartbeat', status);
     if (chatWindow && !chatWindow.isDestroyed()) chatWindow.webContents.send('runtime:heartbeat', status);
     if (healthDropdownWindow && !healthDropdownWindow.isDestroyed() && healthDropdownWindow.isVisible()) {
-      healthDropdownWindow.webContents.send('service-health:data', {
-        mcpRunning: Boolean(status?.mcpRunning),
-        tunnelRunning: Boolean(status?.tunnelRunning),
-        theme: settings.load().theme
-      });
+      healthDropdownWindow.webContents.send('service-health:data', healthDropdownPayload(status));
     }
-  }).catch(() => {}), 5000).unref();
+  }).catch(reportHealthDropdownError), 5000).unref();
   log.info('网页 MCP 助手已启动');
   if (!app.isPackaged) {
     try {
@@ -1818,6 +1879,7 @@ app.on('window-all-closed', () => {
   if (!forceQuit) app.quit();
 });
 app.on('activate', () => showChatWindow());
+}
 
 
 

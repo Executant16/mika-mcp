@@ -18,6 +18,7 @@ function updateHighlight(newIndex) {
   });
   highlightedIndex = newIndex;
   itemElements[newIndex]?.scrollIntoView({ block: 'nearest' });
+  itemElements[newIndex]?.focus({ preventScroll: true });
 }
 
 function selectWorkspaceItem(item) {
@@ -215,7 +216,7 @@ function renderDropdown(payload) {
   const reportHeight = () => {
     const wrapper = document.querySelector('.dropdown-wrapper');
     if (wrapper) {
-      const height = Math.ceil(Math.max(wrapper.getBoundingClientRect().height, wrapper.scrollHeight || 0));
+      const height = Math.ceil(Math.max(wrapper.getBoundingClientRect().height, wrapper.scrollHeight || 0, (card?.scrollHeight || 0) + 16));
       if (height > 50 && Math.abs(height - (window.__lastReportedDropdownHeight || 0)) >= 2) {
         window.__lastReportedDropdownHeight = height;
         if (api?.notifyReady) api.notifyReady(height);
@@ -260,6 +261,12 @@ window.addEventListener('keydown', (e) => {
 
   if (!itemElements.length) return;
 
+  const focused = document.activeElement;
+  const focusedIndex = itemElements.indexOf(focused);
+  const cardFocused = !focused || focused === document.body || focused === document.getElementById('dropdownCard');
+  if (!cardFocused && focusedIndex < 0) return;
+  if (focusedIndex >= 0) highlightedIndex = focusedIndex;
+
   if (e.key === 'ArrowDown') {
     e.preventDefault();
     const next = (highlightedIndex + 1) % itemElements.length;
@@ -269,8 +276,8 @@ window.addEventListener('keydown', (e) => {
     const prev = (highlightedIndex - 1 + itemElements.length) % itemElements.length;
     updateHighlight(prev);
   } else if (e.key === 'Enter') {
-    // 如果当前焦点不在管理按钮上，触发选中项
-    if (document.activeElement !== document.getElementById('manageBtn')) {
+    // 列表按钮交给浏览器原生 Enter；仅容器聚焦时手动激活高亮项。
+    if (cardFocused) {
       e.preventDefault();
       itemElements[highlightedIndex]?.click();
     }

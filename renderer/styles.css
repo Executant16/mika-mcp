@@ -2907,21 +2907,21 @@ svg {
   cursor: pointer !important;
   transition: all .16s cubic-bezier(0.2, 0, 0, 1) !important;
 }
-body[data-theme="dark"] .primary-button {
+body[data-theme="dark"] .primary-button:not(:where(.overview-hero-action-btn)) {
   color: #09090b !important;
   background: #fafafa !important;
   box-shadow: 0 2px 6px rgba(255, 255, 255, 0.1) !important;
 }
-.primary-button:hover:not([disabled]) {
+.primary-button:hover:not([disabled]):not(:where(.overview-hero-action-btn)) {
   background: #27272a !important;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.16) !important;
   transform: translateY(-0.5px) !important;
 }
-body[data-theme="dark"] .primary-button:hover:not([disabled]) {
+:where(body)[data-theme="dark"] .primary-button:hover:where(:not([disabled])):not(:where(.overview-hero-action-btn)) {
   background: #f4f4f5 !important;
   box-shadow: 0 4px 12px rgba(255, 255, 255, 0.18) !important;
 }
-.primary-button:active:not([disabled]) {
+.primary-button:active:not([disabled]):not(:where(.overview-hero-action-btn)) {
   transform: translateY(1px) !important;
 }
 
@@ -13684,7 +13684,7 @@ body[data-theme="dark"] .status-summary-dot.idle {
   flex-shrink: 0 !important;
 }
 
-/* 按钮层级：总览顶部大行动按钮（现代高级品牌蓝微质感，杜绝生硬黑块，纯净高级且富有层次） */
+/* 总览主操作：复用主题的文字/背景配色，避免与全局深色按钮规则交叉覆盖。 */
 .overview-hero-action-btn {
   height: 36px !important;
   min-height: 36px !important;
@@ -13693,46 +13693,31 @@ body[data-theme="dark"] .status-summary-dot.idle {
   font-weight: 600 !important;
   border-radius: var(--radius-md) !important;
   white-space: nowrap !important;
-  background-color: #2563eb !important;
-  background-image: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%) !important;
-  color: #ffffff !important;
-  border: 1px solid #1d4ed8 !important;
-  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.22), 0 2px 5px rgba(37, 99, 235, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+  background: var(--text) !important;
+  color: var(--bg) !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
   filter: none !important;
   transform: none !important;
-  transition: all 0.16s ease !important;
+  transition: background-color 0.16s ease, opacity 0.16s ease !important;
 }
 
-.overview-hero-action-btn:hover {
-  filter: none !important;
-  transform: translateY(-0.5px) !important;
-  background-color: #1d4ed8 !important;
-  background-image: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%) !important;
-  border-color: #1e40af !important;
-  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.28) !important;
+.overview-hero-action-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text) 90%, var(--bg)) !important;
 }
 
-.overview-hero-action-btn:active {
-  transform: translateY(0.5px) !important;
-  background-color: #1e40af !important;
-  background-image: linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%) !important;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.22) !important;
+.overview-hero-action-btn:active:not(:disabled) {
+  background: color-mix(in srgb, var(--text) 80%, var(--bg)) !important;
 }
 
-body[data-theme="dark"] .overview-hero-action-btn {
-  background-color: #2563eb !important;
-  background-image: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%) !important;
-  border-color: rgba(96, 165, 250, 0.45) !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 0 14px rgba(37, 99, 235, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+.overview-hero-action-btn:focus-visible {
+  outline: 2px solid var(--blue) !important;
+  outline-offset: 3px !important;
 }
 
-body[data-theme="dark"] .overview-hero-action-btn:hover {
-  filter: none !important;
-  transform: translateY(-0.5px) !important;
-  background-color: #3b82f6 !important;
-  background-image: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%) !important;
-  border-color: rgba(147, 197, 253, 0.6) !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 18px rgba(59, 130, 246, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.28) !important;
+.overview-hero-action-btn:disabled {
+  opacity: 0.45 !important;
+  cursor: not-allowed !important;
 }
 
 /* 工作区卡片操作按钮组：纯文本极简统一规范，简单明了，杜绝任何杂色块与多余图标 */
@@ -14485,6 +14470,34 @@ body[data-theme="dark"] .active-pulse-dot {
 .setting-text-action.is-playing svg {
   color: var(--primary, #2563eb) !important;
   animation: pulse-dot 0.8s infinite ease-in-out !important;
+}
+
+/* 存储设置：路径独占一行，操作不再挤压长路径。 */
+.storage-settings .settings-section-heading { display:flex; gap:16px; align-items:flex-start; padding:20px 24px 16px; border-bottom:0; }
+.storage-settings .storage-badge { flex:none; margin-left:auto; padding:3px 9px; border:1px solid var(--border); border-radius:var(--radius-pill); color:var(--muted); font-size:var(--fs-xs); white-space:nowrap; }
+.storage-settings .storage-content { padding:0 24px 24px; min-width:0; }
+.storage-settings .storage-location-heading { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:10px; }
+.storage-settings .storage-location-heading b { font-size:var(--fs-sm); font-weight:500; }
+.storage-settings .storage-location-kind { color:var(--muted); font-size:var(--fs-xs); }
+.storage-settings .storage-path { display:block; min-width:0; max-width:100%; white-space:normal; overflow-wrap:anywhere; user-select:text; font-family:inherit; font-size:var(--fs-sm); line-height:1.6; color:var(--text); }
+.storage-settings .storage-current-path { padding:12px 14px; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--surface-2); }
+.storage-settings .storage-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.storage-settings .storage-hint { margin:10px 0 20px; color:var(--muted); font-size:var(--fs-xs); line-height:1.6; }
+.storage-settings .storage-details { border-top:1px solid var(--border); padding-top:14px; }
+.storage-settings .storage-details summary { width:fit-content; cursor:pointer; color:var(--muted); font-size:var(--fs-sm); }
+.storage-settings .storage-details :where(summary):focus-visible { outline:2px solid var(--blue); outline-offset:4px; }
+.storage-settings .storage-details dl { margin:16px 0 0; }
+.storage-settings .storage-detail-group + .storage-detail-group { margin-top:18px; }
+.storage-settings .storage-details dt { color:var(--muted); font-size:var(--fs-xs); margin-bottom:5px; }
+.storage-settings .storage-details dd { margin:0; }
+.storage-settings .storage-reset-action { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; padding-top:8px; }
+.storage-settings .storage-reset-action span { color:var(--muted); font-size:var(--fs-xs); }
+.storage-settings .storage-message { margin:16px 0 0; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-md); color:var(--muted); font-size:var(--fs-xs); line-height:1.6; overflow-wrap:anywhere; }
+.storage-settings .storage-message[data-error="true"] { color:var(--red); border-color:var(--red); }
+.storage-settings .storage-message[hidden] { display:none; }
+@media(max-width:760px) {
+  .storage-settings .settings-section-heading { padding:16px; }
+  .storage-settings .storage-content { padding:0 16px 16px; }
 }
 
 

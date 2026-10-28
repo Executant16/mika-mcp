@@ -80,22 +80,53 @@ class WindowsProcessTreeTests(unittest.TestCase):
             self.assertFalse(pid_is_running(parent.pid))
             self.assertFalse(pid_is_running(child_pid), "child process survived session termination")
         finally:
-            if parent.poll() is None:
-                subprocess.run(
-                    ["taskkill.exe", "/PID", str(parent.pid), "/T", "/F"],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    check=False,
-                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-                )
-            if child_pid and pid_is_running(child_pid):
-                subprocess.run(
-                    ["taskkill.exe", "/PID", str(child_pid), "/F"],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    check=False,
-                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-                )
+            try:
+                try:
+                    try:
+                        if parent.poll() is None:
+                            subprocess.run(
+                                ["taskkill.exe", "/PID", str(parent.pid), "/T", "/F"],
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                                check=False,
+                                timeout=5,
+                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                            )
+                    finally:
+                        try:
+                            parent.wait(timeout=1)
+                        except subprocess.TimeoutExpired:
+                            try:
+                                parent.kill()
+                            finally:
+                                parent.wait(timeout=5)
+                finally:
+                    if child_pid and pid_is_running(child_pid):
+                        try:
+                            subprocess.run(
+                                ["taskkill.exe", "/PID", str(child_pid), "/F"],
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                                check=False,
+                                timeout=5,
+                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                            )
+                        finally:
+                            deadline = time.time() + 5
+                            while time.time() < deadline and pid_is_running(child_pid):
+                                time.sleep(0.1)
+                            if pid_is_running(child_pid):
+                                raise RuntimeError(
+                                    f"child process {child_pid} remained active after cleanup"
+                                )
+            finally:
+                # Close both handles even if process cleanup or the first close fails.
+                try:
+                    if parent.stdout is not None:
+                        parent.stdout.close()
+                finally:
+                    if parent.stderr is not None:
+                        parent.stderr.close()
 
 
 if __name__ == "__main__":

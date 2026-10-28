@@ -3,6 +3,7 @@ const $ = (selector) => document.querySelector(selector);
 let switching = false;
 let activeWorkspace = '';
 let lastRuntimeState = null;
+let lastChatState = null;
 let lastRuntimeCheckAt = 0;
 
 /* ── 主题接线 ───────────────────────────────────────────────────────────────
@@ -156,6 +157,7 @@ function progressLabelForTask(task, status, runningOperation, command, progress)
 
 function renderChatState(state) {
   if (!state) return;
+  lastChatState = state;
   $('#backButton').disabled = !state.canGoBack;
   $('#forwardButton').disabled = !state.canGoForward;
   const element = $('#pageState');
@@ -167,15 +169,9 @@ function renderChatState(state) {
     : state.isVerification
       ? '正在进行安全验证…'
       : state.loading ? '正在切换页面…' : 'ChatGPT 已就绪';
-  /* 第 26 轮：就绪态不再占位。
-   * 原先这个元素恒占 210px 显示「ChatGPT 已就绪」，但"已就绪"是默认状态、
-   * 不含任何新信息 —— 它是工具栏里最宽的单个元素之一，天天挂着纯属浪费。
-   * 只在**过渡与异常**时显示：
-   *   loading → 「正在切换页面…」  有信息量（用户在等）
-   *   error   → 「加载失败：…」   承重功能，是用户唯一能看到失败原因的地方
-   * 注意别把 hidden 与 loading 搞混：hidden 在 setSession 场景（冷启动）下最初为 true，
-   * 首次 chat:state 到达前什么也不显示 —— 这是想要的（占位由 .loading-stage 承担）。 */
-  element.hidden = !state.loading && !state.error;
+  // 保留兼容节点，但不再占用顶栏；完整状态由现有气泡窗展示。
+  element.hidden = true; // 网页状态统一在系统服务气泡窗中展示。
+  renderHealthPill(Boolean(lastRuntimeState?.mcpRunning), Boolean(lastRuntimeState?.tunnelRunning));
 }
 
 /* ★ 胶囊文案抽成**纯函数**，不碰 DOM。
@@ -183,11 +179,13 @@ function renderChatState(state) {
  * 是本轮新增的唯一一处判断逻辑。它留在 renderXxx 里就只能靠正则断言
  * —— 而正则断言不出"两项都断时该说几项"。抽出来后测试可以**真跑**它，
  * 逐档比较输出，这样"2 项异常"这种数字就不会悄悄算错。 */
-function healthPillText(mcpRunning, tunnelRunning, checking) {
-  if (checking) return '状态检查中';
+function healthPillText(mcpRunning, tunnelRunning, checking, chatState = null) {
+  if (checking) return chatState?.error ? '网页加载失败' : '状态检查中';
   const abnormal = [];
   if (!mcpRunning) abnormal.push('本地工具');
   if (!tunnelRunning) abnormal.push('连接通道');
+  if (chatState?.error) abnormal.push('网页加载');
+  if (chatState?.error) return abnormal.length === 1 ? '网页加载失败' : `${abnormal.length} 项异常`;
   /* 三档文案的取值理由：
    *   · 0 项异常 → 「服务正常」（结论，最短）
    *   · 1 项异常 → 直接点名那一项（「连接通道未就绪」）——
@@ -195,7 +193,12 @@ function healthPillText(mcpRunning, tunnelRunning, checking) {
    *     因为用户下一步就是去修它。
    *   · 2 项异常 → 「服务未启动 · 2 项异常」（用户给的示例形态）——
    *     两项都断时点名没有意义（"都断了"），数量才是信息。 */
-  if (abnormal.length === 0) return '服务正常';
+  if (abnormal.length === 0) {
+    if (!chatState) return '状态检查中';
+    if (chatState.isVerification) return '等待网页验证';
+    if (chatState.loading || chatState.revealed === false) return '网页加载中';
+    return '服务正常';
+  }
   if (abnormal.length === 1) return `${abnormal[0]}未就绪`;
   return `服务未启动 · ${abnormal.length} 项异常`;
 }
@@ -206,20 +209,15 @@ function renderHealthPill(mcpRunning, tunnelRunning) {
   const dot = pill?.querySelector('i');
   if (!pill || !text || !dot) return;
   const checking = !lastRuntimeState;
-  const isHealthy = !checking && mcpRunning && tunnelRunning;
-  const hasError = !checking && !(mcpRunning && tunnelRunning);
+  const chatReady = Boolean(lastChatState) && !lastChatState.error && !lastChatState.loading
+    && !lastChatState.isVerification && lastChatState.revealed !== false;
+  const isHealthy = !checking && mcpRunning && tunnelRunning && chatReady;
+  const hasError = Boolean(lastChatState?.error) || (!checking && (!mcpRunning || !tunnelRunning));
   dot.classList.toggle('ready', isHealthy);
   dot.classList.toggle('warn', hasError);
-  text.textContent = healthPillText(mcpRunning, tunnelRunning, checking);
+  text.textContent = healthPillText(mcpRunning, tunnelRunning, checking, lastChatState);
   pill.classList.toggle('has-error', hasError);
   pill.classList.toggle('is-healthy', isHealthy);
-  if (hasError) {
-    pill.title = `服务异常（本地工具：${mcpRunning ? '运行中' : '未运行'}；连接通道：${tunnelRunning ? '已连接' : '未连接'}）· 点击前往配置`;
-  } else if (isHealthy) {
-    pill.title = '服务运行正常（本地工具与连接通道均已就绪）';
-  } else {
-    pill.title = '正在读取本地服务状态…';
-  }
 }
 
 function renderServiceState(state) {

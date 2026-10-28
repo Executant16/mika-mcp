@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; connect-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'">
+  <title>Mika 数据恢复</title>
+  <link rel="stylesheet" href="design-tokens.css">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="storage-bootstrap.css">
+</head>
+<body class="storage-bootstrap-page">
+  <main class="bootstrap-shell" aria-labelledby="pageTitle">
+    <header class="bootstrap-header">
+      <img class="bootstrap-mark" src="../electron/app-icon.png" alt="Mika">
+      <div>
+        <p class="bootstrap-eyebrow">MIKA MCP</p>
+        <h1 id="pageTitle">数据目录检查</h1>
+      </div>
+    </header>
+
+    <section id="progressPanel" class="bootstrap-panel" aria-labelledby="progressTitle" aria-live="polite" hidden>
+      <div class="panel-heading">
+        <span class="state-indicator working" aria-hidden="true"></span>
+        <div>
+          <h2 id="progressTitle">正在处理数据</h2>
+          <p id="progressDescription" class="panel-description">请保持 Mika 打开，处理完成后即可继续。</p>
+        </div>
+      </div>
+      <dl class="progress-details">
+        <div>
+          <dt>当前阶段</dt>
+          <dd id="progressPhase">正在准备</dd>
+        </div>
+        <div id="progressFilesRow" hidden>
+          <dt>文件</dt>
+          <dd id="progressFiles"></dd>
+        </div>
+        <div id="progressBytesRow" hidden>
+          <dt>数据量</dt>
+          <dd id="progressBytes"></dd>
+        </div>
+      </dl>
+      <progress id="progressMeter" class="progress-meter" max="1" value="0" aria-label="处理进度" hidden></progress>
+      <p id="progressError" class="inline-error" role="alert" hidden></p>
+      <p id="progressDoneMessage" class="success-message" hidden>数据处理完成，可以进入 Mika。</p>
+      <div class="bootstrap-actions">
+        <button id="continueButton" class="button-primary" type="button" hidden>进入 Mika</button>
+        <button class="button-secondary quit-button" type="button">退出</button>
+      </div>
+    </section>
+
+    <section id="recoveryPanel" class="bootstrap-panel" aria-labelledby="recoveryTitle" hidden>
+      <div class="panel-heading">
+        <span class="state-indicator needs-attention" aria-hidden="true"></span>
+        <div>
+          <h2 id="recoveryTitle">需要重新定位数据</h2>
+          <p class="panel-description">Mika 无法从保存的位置读取数据。选择已有目录后，程序会先备份定位配置再恢复。</p>
+        </div>
+      </div>
+
+      <p id="recoveryError" class="inline-error" role="alert" hidden></p>
+
+      <dl class="location-details">
+        <div>
+          <dt>当前数据根目录</dt>
+          <dd id="currentRoot">未能读取</dd>
+        </div>
+        <div>
+          <dt>定位配置文件</dt>
+          <dd id="locatorFile">未能读取</dd>
+        </div>
+      </dl>
+
+      <div class="directory-picker">
+        <div class="picker-copy">
+          <h3>已有配置目录</h3>
+          <p>选择包含 Mika 配置的现有目录。不会创建空配置目录。</p>
+        </div>
+        <button id="chooseProfileButton" class="button-secondary" type="button">选择目录</button>
+        <p id="profilePath" class="selected-path" aria-live="polite">尚未选择</p>
+      </div>
+
+      <div class="directory-picker">
+        <div class="picker-copy">
+          <h3>长期记忆目录</h3>
+          <p>选择现有记忆目录，或确认原配置没有使用长期记忆。</p>
+        </div>
+        <button id="chooseMemoryButton" class="button-secondary" type="button">选择目录</button>
+        <p id="memoryPath" class="selected-path" aria-live="polite">尚未选择</p>
+        <label class="empty-memory-option">
+          <input id="allowEmptyMemory" type="checkbox">
+          <span>该配置原本未使用长期记忆，允许新建记忆子目录</span>
+        </label>
+      </div>
+
+      <p id="recoveryRequirement" class="requirement-hint">选择已有记忆目录，或勾选上方选项以允许新建空记忆子目录。</p>
+      <p id="recoveryOperationError" class="inline-error" role="alert" hidden></p>
+
+      <div id="recoveryConfirmation" class="confirmation-card" hidden>
+        <h3>请核对恢复位置</h3>
+        <dl class="location-details confirmation-details">
+          <div>
+            <dt>配置目录</dt>
+            <dd id="confirmProfilePath"></dd>
+          </div>
+          <div>
+            <dt>长期记忆</dt>
+            <dd id="confirmMemoryPath"></dd>
+          </div>
+          <div>
+            <dt>定位配置</dt>
+            <dd id="confirmLocatorFile"></dd>
+          </div>
+        </dl>
+        <p class="backup-note">确认后会先备份上方的原定位配置，再写入新位置。源数据目录不会被删除。</p>
+        <div class="bootstrap-actions">
+          <button id="cancelConfirmationButton" class="button-secondary" type="button">返回修改</button>
+          <button id="confirmRecoveryButton" class="button-primary" type="button">确认恢复</button>
+        </div>
+      </div>
+
+      <p id="recoveryRestartMessage" class="success-message" hidden>数据位置已恢复，正在重新启动 Mika…</p>
+      <div class="bootstrap-actions recovery-actions">
+        <button id="reviewRecoveryButton" class="button-primary" type="button" disabled>核对并继续</button>
+        <button id="retryRestartButton" class="button-primary" type="button" hidden>重新进入 Mika</button>
+        <button class="button-secondary quit-button" type="button">退出</button>
+      </div>
+    </section>
+
+    <div id="bootstrapFatalError" class="fatal-container" hidden>
+      <p id="bootstrapFatalMessage" class="inline-error fatal-error" role="alert"></p>
+      <div class="bootstrap-actions">
+        <button class="button-secondary quit-button" type="button">退出</button>
+      </div>
+    </div>
+  </main>
+  <script src="storage-bootstrap.js"></script>
+</body>
+</html>

@@ -2,7 +2,8 @@
 
 让网页版 ChatGPT 直接连接 Windows 本地开发环境，把网页聊天变成一个可以读取项目、修改代码、执行命令、跑测试和构建安装包的桌面开发助手。
 
-当前桌面版本：**v0.1.0**  
+当前源码桌面版本：**v0.1.5**（待发布）
+
 内置 Coding Tools MCP Runtime：**v0.4.9**  
 平台：**Windows**
 
@@ -270,7 +271,7 @@
 普通使用不需要配置开发环境：
 
 1. 打开 GitHub 页面右侧 **[Releases](../../releases)**。
-2. 下载最新安装包：`mika-mcp-setup-0.1.0.exe`。
+2. 下载 Releases 中已发布的最新安装包。本源码版本的预期产物为 `mika-mcp-setup-0.1.5.exe`，尚未发布时请以发行页实际附件为准。
 3. 双击安装。
 4. 打开助手，选择工作目录。
 5. 按“接入指南”配置 OpenAI Tunnel 和 ChatGPT MCP。
@@ -301,6 +302,12 @@ npm run dist
 
 构建产物默认位于 `dist/`。
 
+当前进程关系、运行时目录、安全边界与版本编号见 [架构说明](docs/ARCHITECTURE.md)。
+
+源码开发版已使用独立配置、浏览器会话和记忆目录：`<源码仓库父目录>/Mika-Data/development/<仓库路径哈希>/profile`。本仓库默认位于 D 盘；可用绝对路径环境变量 `MIKA_DEVELOPMENT_DATA_ROOT` 覆盖 development 基目录，Windows 下拒绝 C 盘。开发临时文件和崩溃转储也归入该 profile，仅改变当前进程环境。首次启动是新环境，不自动复制正式数据或旧探针会话。正式版默认路径保持原样，可在“设置 → 常规 → 数据与存储”选择自定义位置，经重启复制校验后切换并保留原目录；见 [自定义正式数据目录](docs/storage-settings.md)。完整分工与剩余约束见 [数据目录规范与迁移方案（部分实现）](docs/data-directory-policy.md)。
+
+推送版本标签（例如 `v0.1.5`）后，GitHub Actions 会检查、构建并自动发布 Windows 安装包。普通代码推送仅做 CI 检查；标签必须在验收通过并取得发布授权后再推送。版本更新和发布步骤见 [自动发布说明](docs/releasing.md)。
+
 ---
 
 ## 🔐 安全边界说明
@@ -328,7 +335,7 @@ Git Worktree 隔离能降低复杂任务直接修改主工作区的风险，但�
 
 ## 📌 版本信息
 
-- 网页 MCP 助手：**0.1.0**
+- 网页 MCP 助手源码：**0.1.5**（待发布）
 - Coding Tools MCP Runtime：**0.4.9**
 - Electron：**43.2.0**
-- Windows 安装包：`mika-mcp-setup-0.1.0.exe`
+- 预期 Windows 安装包：`mika-mcp-setup-0.1.5.exe`

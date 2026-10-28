@@ -73,7 +73,7 @@ test('renderSnapshot preserves the authoritative workspace snapshot while updati
       tunnelRunning: true,
       localMcpUrl: 'http://127.0.0.1:18765/mcp'
     },
-    appVersion: '0.1.0'
+    appVersion: JSON.parse(read('package.json')).version
   };
   const before = structuredClone(snapshot);
   const state = { lastTaskPayload: null };

@@ -1,6 +1,6 @@
 {
   "name": "mika-mcp",
-  "version": "0.1.0",
+  "version": "0.1.5",
   "description": "一键部署与管理 Coding Tools MCP、OpenAI Tunnel 和 ChatGPT 接入的 Windows 桌面助手",
   "author": {
     "name": "Executant16"
@@ -10,7 +10,7 @@
   "scripts": {
     "icon:build": "node scripts/generate-icon.js",
     "start": "electron . --no-sandbox --disable-gpu --enable-logging",
-    "test": "node scripts/run-python-tests.js && node --test tests/*.test.js && node scripts/check-source-root-clean.js",
+    "test": "node scripts/run-python-tests.js && node --test tests/*.test.js test/*.test.js && node scripts/check-source-root-clean.js",
     "lint:css": "stylelint \"renderer/**/*.css\"",
     "check:css-ratchet": "node scripts/check-css-ratchet.js",
     "check:contrast": "node scripts/check-contrast.js",

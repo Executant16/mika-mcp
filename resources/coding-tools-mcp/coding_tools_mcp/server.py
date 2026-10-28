@@ -101,6 +101,7 @@ from .memory_write import MemoryCandidateStore, MemoryWriteError, inspect_memory
 from .memory_backup import MemoryBackupService
 
 from .transport_stdio import serve_stdio
+from .runtime_cleanup import RuntimeCleanupError, write_owner_marker, retire_runtime_dir
 
 
 SERVER_NAME = "coding-tools-mcp"
@@ -569,25 +570,51 @@ def workspace_runtime_hash(workspace: Path) -> str:
 
 
 def runtime_dir_for_workspace(workspace: Path, instance_id: str) -> Path:
-    root = runtime_parent_root()
+    configured = configured_runtime_root()
     try:
-        root_in_workspace = is_relative_to(root.resolve(strict=False), workspace.expanduser().resolve(strict=False))
-    except OSError:
-        root_in_workspace = False
-    if root_in_workspace:
-        if configured_runtime_root() is not None:
+        root = runtime_parent_root().resolve(strict=False)
+        workspace_root = workspace.expanduser().resolve(strict=False)
+        cwd = Path.cwd().resolve(strict=False)
+    except OSError as exc:
+        raise ToolFailure("RUNTIME_DIR_UNWRITABLE", f"Runtime directory could not be resolved: {exc}") from exc
+    if configured is not None:
+        if is_relative_to(root, workspace_root):
             raise ToolFailure(
                 "INVALID_ARGUMENT",
                 f"{ENV_PREFIX}_RUNTIME_ROOT must be outside the configured workspace.",
                 category="validation",
             )
-        root = runtime_parent_fallback_root() or root
+    elif is_relative_to(root, workspace_root) or root.parent == cwd:
+        # tempfile can silently choose cwd when the OS temp directory is blocked.
+        # Never create private runtime directories in that fallback location.
+        try:
+            fallback = runtime_parent_fallback_root()
+            if fallback is not None:
+                fallback = fallback.resolve(strict=False)
+        except OSError:
+            fallback = None
+        if fallback is None or is_relative_to(fallback, workspace_root) or fallback.parent == cwd:
+            raise ToolFailure(
+                "RUNTIME_DIR_UNWRITABLE",
+                f"No runtime directory is available outside the workspace; set {ENV_PREFIX}_RUNTIME_ROOT to a writable external directory.",
+                category="runtime",
+                details={"attempted": str(root)},
+            )
+        root = fallback
     return root / workspace_runtime_hash(workspace) / instance_id
 
 
 def fallback_runtime_dir_for_workspace(workspace: Path, instance_id: str) -> Path | None:
-    fallback = runtime_parent_fallback_root()
-    if fallback is None:
+    try:
+        fallback = runtime_parent_fallback_root()
+        if fallback is None:
+            return None
+        fallback = fallback.resolve(strict=False)
+        workspace_root = workspace.expanduser().resolve(strict=False)
+        cwd = Path.cwd().resolve(strict=False)
+    except OSError:
+        return None
+    if is_relative_to(fallback, workspace_root) or fallback.parent == cwd:
         return None
     return fallback / workspace_runtime_hash(workspace) / instance_id
 
@@ -1574,6 +1601,7 @@ class Runtime:
         self.auth_token = auth_token or None
         self.oauth_config = oauth_config
         self.server_instance_id = secrets.token_urlsafe(12)
+        self.runtime_launch_id = os.environ.get(f"{ENV_PREFIX}_LAUNCH_ID") or secrets.token_hex(16)
         self._set_runtime_dir(runtime_dir_for_workspace(self.workspace.root, self.server_instance_id))
         self.fallback_runtime_dir = fallback_runtime_dir_for_workspace(self.workspace.root, self.server_instance_id)
         self.default_cwd = self.workspace.root
@@ -1642,8 +1670,30 @@ class Runtime:
             if session.process.poll() is None:
                 terminate_process_group(session.process, signal.SIGTERM)
             session.drain_readers()
-        shutil.rmtree(self.runtime_dir, ignore_errors=True)
+        self._retire_runtime_directory(
+            self.runtime_dir, reason="runtime-close",
+            stopped_sessions=sessions,
+        )
         self.telemetry.finish()
+
+    def _retire_runtime_directory(self, runtime_dir: Path, *, reason: str, stopped_sessions: list[ExecSession] | None = None) -> None:
+        # Keep command data in place until commands and background work have ended.
+        with self.sessions_lock:
+            active = self.starting_sessions or any(session.process.poll() is None for session in self.sessions.values())
+            active = active or any(session.process.poll() is None for session in (stopped_sessions or []))
+        with self.background_operations_lock:
+            background_active = any(not operation["event"].is_set() for operation in self.background_operations.values())
+        if active or background_active:
+            result = {"ok": False, "errors": ["运行时仍有命令或后台操作，已保留临时目录。"], "original_path": str(runtime_dir)}
+        else:
+            result = retire_runtime_dir(
+                runtime_dir, process_id=os.getpid(),
+                launch_id=self.runtime_launch_id,
+                instance_id=self.server_instance_id, reason=reason,
+            )
+        if not result.get("ok") or result.get("warnings"):
+            if sys.stderr is not None:
+                print(json.dumps({"event": "runtime-cleanup", **result}, ensure_ascii=False), file=sys.stderr, flush=True)
 
     def set_authorized_roots(self, roots: list[str]) -> dict[str, Any]:
         parsed = [Path(str(item)) for item in roots if str(item).strip()]
@@ -1665,6 +1715,11 @@ class Runtime:
         if not target.is_dir():
             raise ToolFailure("NOT_A_DIRECTORY", "Workspace must be an existing directory.", category="validation")
         with self.workspace_switch_lock:
+            if self._closed:
+                raise ToolFailure("RUNTIME_CLOSED", "Runtime is closed.")
+            with self.background_operations_lock:
+                if any(not operation["event"].is_set() for operation in self.background_operations.values()):
+                    raise ToolFailure("WORKSPACE_BUSY", "Cannot switch workspace while background operations are running.", category="runtime", retryable=True)
             with self.sessions_lock:
                 active = [session for session in self.sessions.values() if session.process.poll() is None]
                 if active or self.starting_sessions:
@@ -1713,7 +1768,7 @@ class Runtime:
                 self.patch_baselines.clear()
             self.workspace_generation += 1
             self._ensure_runtime_dirs()
-            shutil.rmtree(old_runtime_dir, ignore_errors=True)
+            self._retire_runtime_directory(old_runtime_dir, reason="workspace-switch")
             self.preheat_workspace_async()
             return {
                 "ready": True,
@@ -1723,6 +1778,12 @@ class Runtime:
             }
 
     def _ensure_runtime_dirs(self) -> None:
+        with self.sessions_lock:
+            if self._closed:
+                raise ToolFailure("RUNTIME_CLOSED", "Runtime is closed; temporary directories will not be recreated.")
+            self._ensure_runtime_dirs_locked()
+
+    def _ensure_runtime_dirs_locked(self) -> None:
         candidates = [self.runtime_dir]
         if self.fallback_runtime_dir is not None and self.fallback_runtime_dir not in candidates:
             candidates.append(self.fallback_runtime_dir)
@@ -1743,8 +1804,14 @@ class Runtime:
                             path.chmod(0o700)
                         except OSError:
                             pass
+                write_owner_marker(
+                    self.runtime_dir, workspace=self.workspace.root,
+                    instance_id=self.server_instance_id,
+                    launch_id=self.runtime_launch_id,
+                    process_id=os.getpid(),
+                )
                 return
-            except OSError as exc:
+            except (OSError, RuntimeCleanupError) as exc:
                 errors.append(f"{runtime_dir}: {exc}")
         raise ToolFailure(
             "RUNTIME_DIR_UNWRITABLE",

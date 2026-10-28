@@ -95,8 +95,8 @@ test('top chrome keeps its height contract, and every removed control still has 
   assert.match(browserHtml, /id="pageState" hidden/, 'pageState 初始应隐藏');
   assert.match(browserCss, /\.page-state\[hidden\]\{\s*display:none/,
     '必须显式声明 [hidden]，否则 display:flex 会让 hidden 失效');
-  assert.match(read('renderer/browser.js'), /element\.hidden = !state\.loading && !state\.error/,
-    'pageState 应只在加载/失败时显示');
+  assert.match(read('renderer/browser.js'), /element\.hidden = true/,
+    '网页状态已归入系统服务气泡窗，不在顶栏单独显示');
 });
 
 test('embedded ChatGPT compacts repeated tool call records without deleting their content', () => {

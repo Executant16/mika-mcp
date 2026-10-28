@@ -1,0 +1,62 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+      PYTHONDONTWRITEBYTECODE: '1'
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 校验标签与版本号
+        run: node scripts/check-release.cjs version
+      - name: 安装完整构建依赖（含 Electron）
+        run: npm ci
+      - name: 检查测试、样式及 Schema 契约
+        run: |
+          npm run verify
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/check-schema-contract.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: 准备内置 Python
+        run: ./scripts/prepare-native-runtime.ps1
+      - name: 构建 Windows x64 安装包
+        run: |
+          npm run icon:build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx --no-install electron-builder --win nsis --x64 --publish never
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: 校验安装包与更新清单
+        run: node scripts/check-release.cjs assets
+      - name: 上传附件并正式发布
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $version = (Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json).version
+          gh release create "$env:RELEASE_TAG" "dist/mika-mcp-setup-$version.exe" "dist/mika-mcp-setup-$version.exe.blockmap" "dist/latest.yml" --verify-tag --title "Mika MCP $env:RELEASE_TAG" --generate-notes --latest
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -12,14 +12,15 @@ function sanitizeForDisk(data) {
 }
 
 class SettingsStore {
-  constructor() {
+  constructor({ development = false } = {}) {
+    this.development = development;
     this._cached = null;
     this._startupResetDone = false;
   }
 
   load(forceReload = false) {
     if (!this._cached || forceReload) {
-      const data = normalize(readJson(settingsFile(), {}));
+      const data = normalize(readJson(settingsFile(), {}), { development: this.development });
       if (!this._startupResetDone) {
         // 应用冷启动加载时，敏感操作保护自动锁上（防误触安全闭环）
         data.developerMode = false;
@@ -32,7 +33,7 @@ class SettingsStore {
   }
 
   save(patch) {
-    const next = normalize({ ...this.load(), ...patch });
+    const next = normalize({ ...this.load(), ...patch }, { development: this.development });
     this._cached = next;
     try {
       writeJsonAtomic(settingsFile(), sanitizeForDisk(next));

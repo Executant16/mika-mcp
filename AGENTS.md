@@ -33,6 +33,10 @@
 
 ## 版本发布
 
+- 默认保持当前桌面与 MCP Runtime 发行版本号。修复、优化、测试、构建安装包、提交或推送代码，都不构成升级版本或发布新版本的授权；不得为记录普通改动自行执行 `npm version` 或修改发行版本字段及对应展示、测试、文档。
+- 只有用户明确要求升级版本或发布新版本，并指定目标版本号或明确授权选择版本号时，才允许修改发行版本号。若目标版本未明确且未授权选择，先完成不依赖版本号的工作，再询问目标版本。
+- 修改版本号、创建版本标签、推送版本标签及发布 Release 是不同操作；仅授权修改版本号或提交推送代码，不得推断为授权创建/推送发布标签或发布 Release。不得自行修改或删除这些约束来绕过授权。
+- `TOOL_SCHEMA_VERSION` 是协议契约编号，不是发行版本号；公开协议变更仍遵守上面的 Schema 同步规则，但不因此自动提高桌面或 MCP Runtime 发行版本。
 - 桌面版本至少同步：`package.json`、`package-lock.json`、管理界面版本展示、相关测试与文档。
 - MCP Runtime 版本同步：`coding_tools_mcp/__init__.py` 与 `pyproject.toml`。
 - Schema 契约中的 runtime version、schema version、schema hash、tool count 必须由脚本生成并与运行时一致。

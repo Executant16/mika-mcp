@@ -8,6 +8,7 @@ const DEFAULTS = Object.freeze({
   permissionMode: 'safe',
   mcpPort: 18765,
   healthPort: 18081,
+  developmentPortsMigrated: false,
   proxyMode: 'auto',
   proxyUrl: '',
   tunnelId: '',
@@ -66,10 +67,13 @@ function mergeRecentWorkspaces(existing, workspace, limit = 50) {
   return result;
 }
 
-function normalize(input = {}) {
+const DEVELOPMENT_PORTS = Object.freeze({ mcpPort: 28765, healthPort: 28081 });
+
+function normalize(input = {}, { development = false } = {}) {
   const sourceVersion = Number(input.configVersion) || 0;
   const sourceMode = String(input.connectionMode || '').trim();
-  const merged = { ...DEFAULTS };
+  const ports = development ? DEVELOPMENT_PORTS : DEFAULTS;
+  const merged = { ...DEFAULTS, mcpPort: ports.mcpPort, healthPort: ports.healthPort };
   for (const key of Object.keys(DEFAULTS)) {
     if (Object.hasOwn(input, key)) merged[key] = input[key];
   }
@@ -82,8 +86,15 @@ function normalize(input = {}) {
   }
   merged.permissionMode = ['safe', 'trusted'].includes(merged.permissionMode) ? merged.permissionMode : 'safe';
   merged.proxyMode = ['auto', 'system', 'manual', 'direct'].includes(merged.proxyMode) ? merged.proxyMode : 'auto';
-  merged.mcpPort = Number.isInteger(Number(merged.mcpPort)) ? Number(merged.mcpPort) : 18765;
-  merged.healthPort = Number.isInteger(Number(merged.healthPort)) ? Number(merged.healthPort) : 18081;
+  merged.mcpPort = Number.isInteger(Number(merged.mcpPort)) ? Number(merged.mcpPort) : ports.mcpPort;
+  merged.healthPort = Number.isInteger(Number(merged.healthPort)) ? Number(merged.healthPort) : ports.healthPort;
+  if (development && merged.developmentPortsMigrated !== true) {
+    // Only the legacy default pair is upgraded. Custom/mixed pairs are preserved.
+    if (merged.mcpPort === DEFAULTS.mcpPort && merged.healthPort === DEFAULTS.healthPort) {
+      Object.assign(merged, DEVELOPMENT_PORTS);
+    }
+    merged.developmentPortsMigrated = true;
+  }
   merged.proxyUrl = String(merged.proxyUrl || '').trim();
   merged.workspace = normalizeWorkspacePath(merged.workspace);
   merged.tunnelId = String(merged.tunnelId || '').trim();
@@ -148,6 +159,7 @@ function validateRuntimeSettings(settings) {
 
 module.exports = {
   DEFAULTS,
+  DEVELOPMENT_PORTS,
   normalize,
   validateRuntimeSettings,
   normalizeWorkspacePath,

@@ -1,4 +1,6 @@
 :root {
+  --fs-12-5: 12.5px;
+  --radius-md: 6px;
   --bg-card: #ffffff;
   --bg-subtle: #f8fafc;
   --bg-hover: rgba(0, 0, 0, 0.04);
@@ -18,7 +20,7 @@
   --bg-card: #20232a;
   --bg-subtle: #191c22;
   --bg-hover: rgba(255, 255, 255, 0.06);
-  --border-card: rgba(255, 255, 255, 0.09);
+  --border-card: rgba(255, 255, 255, 0.14);
   --border-subtle: rgba(255, 255, 255, 0.06);
   --text-main: #f1f5f9;
   --text-muted: #94a3b8;
@@ -27,7 +29,7 @@
   --primary-blue-hover: #60a5fa;
   --success-green: #34d399;
   --danger-red: #f87171;
-  --shadow: 0 16px 40px -4px rgba(0, 0, 0, 0.60), 0 4px 16px rgba(0, 0, 0, 0.35);
+  --shadow: none;
 }
 
 * {
@@ -152,9 +154,12 @@ html, body {
   flex-direction: column;
   gap: 10px;
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .service-item {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -255,9 +260,49 @@ html, body {
   font-size: 12.5px;
   color: var(--text-muted);
   line-height: 1.45;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.chat-state-description {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-height: 90px;
+  overflow-y: auto;
+  user-select: text;
+}
+
+.service-action-error {
+  margin-top: 6px;
+  color: var(--danger-red);
+  font-size: var(--fs-12-5);
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.service-action-error[hidden] { display: none; }
+.btn-action.health-refresh { min-width: 56px; padding: 0 8px; height: 28px; }
+.health-read-error { color: var(--danger-red); font-size: var(--fs-12-5); line-height: 1.5; overflow-wrap: anywhere; max-height: 72px; overflow-y: auto; flex-shrink: 0; }
+.health-read-error[hidden] { display: none; }
+
+.chat-error-details { margin-top: 6px; color: var(--text-muted); font-size: var(--fs-12-5); }
+.chat-error-details[hidden] { display: none; }
+.chat-error-details summary { cursor: pointer; width: fit-content; }
+.chat-error-details summary:focus-visible { outline: 2px solid var(--primary-blue); outline-offset: 3px; }
+.chat-error-details code {
+  display: block;
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 140px;
+  overflow-y: auto;
+  user-select: text;
+  font-family: inherit;
+  line-height: 1.5;
 }
 
 .service-action-area {

@@ -18,11 +18,32 @@
         </div>
         <div class="header-right">
           <span class="status-summary-pill" id="summaryPill">检查中</span>
+          <button type="button" class="btn-action btn-ghost health-refresh" id="healthRefreshBtn">刷新</button>
         </div>
       </div>
 
       <!-- 服务列表区 -->
+      <p class="health-read-error" id="healthReadError" role="status" aria-live="polite" hidden></p>
       <div class="service-list">
+        <div class="service-item" id="chatItem">
+          <div class="service-icon-box" id="chatIconBox">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="2"/>
+              <path d="M3 9h18M7 6.5h.01M10 6.5h.01"/>
+            </svg>
+          </div>
+          <div class="service-main">
+            <div class="service-title-row">
+              <strong class="service-name">ChatGPT 网页</strong>
+              <span class="service-state-tag" id="chatStateTag">检查中</span>
+            </div>
+            <div class="service-desc chat-state-description" id="chatStateDescription" role="status" aria-live="polite">正在读取网页状态…</div>
+            <details class="chat-error-details" id="chatErrorDetails" hidden>
+              <summary>技术详情</summary>
+              <code id="chatErrorTechnical"></code>
+            </details>
+          </div>
+        </div>
         
         <!-- 1. 本地 MCP 工具 -->
         <div class="service-item" id="mcpItem">
@@ -36,7 +57,8 @@
               <strong class="service-name">本地 MCP 工具</strong>
               <span class="service-state-tag" id="mcpStateTag">未运行</span>
             </div>
-            <div class="service-desc">提供本地代码工作区读写、测试构建与终端命令执行能力</div>
+            <div class="service-desc">读写工作区，执行测试、构建和命令</div>
+            <p class="service-action-error" id="mcpActionError" role="status" aria-live="polite" hidden></p>
           </div>
           <div class="service-action-area">
             <button type="button" class="btn-action" id="mcpActionBtn">
@@ -59,7 +81,7 @@
               <strong class="service-name">连接通道 (OpenAI Tunnel)</strong>
               <span class="service-state-tag" id="tunnelStateTag">未连接</span>
             </div>
-            <div class="service-desc">打通 ChatGPT 云端与本地服务的反向代理加密通信链路</div>
+            <div class="service-desc">让 ChatGPT 调用本地 MCP 工具</div>
           </div>
           <div class="service-action-area">
             <button type="button" class="btn-action btn-secondary" id="tunnelActionBtn">
