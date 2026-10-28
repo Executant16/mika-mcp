@@ -183,7 +183,9 @@ def _owner_data(
     resolved_workspace = workspace.expanduser().resolve(strict=False)
     if _workspace_hash(resolved_workspace) != workspace_hash:
         raise RuntimeCleanupError("runtime directory does not match the workspace hash")
-    if _is_within(root, resolved_workspace):
+    # Path-chain checks above reject links first. Resolve the remaining 8.3
+    # aliases as well, so both sides use the same Windows path spelling.
+    if _is_within(root.resolve(strict=False), resolved_workspace):
         raise RuntimeCleanupError("runtime root is inside the marked workspace")
     return {
         "format": 1,

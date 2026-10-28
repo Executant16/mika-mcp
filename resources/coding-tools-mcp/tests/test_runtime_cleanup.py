@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import ctypes
 import gc
 import hashlib
 import io
@@ -426,6 +427,34 @@ class RuntimeCleanupTests(unittest.TestCase):
                 launch_id="launch-test",
                 process_id=424_242,
             )
+
+    @unittest.skipUnless(os.name == "nt", "Windows path alias")
+    def test_runtime_root_inside_workspace_with_path_alias_is_rejected(self) -> None:
+        nested_root = self.workspace / "runtime-root"
+        nested_instance = nested_root / self.workspace_hash / "nested-alias"
+        nested_instance.mkdir(parents=True)
+        # Hosted Windows runners use an 8.3 spelling in TEMP. Keep the hash
+        # and instance names intact, shortening only their root's ancestors.
+        get_short_path = ctypes.WinDLL("kernel32", use_last_error=True).GetShortPathNameW
+        get_short_path.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32]
+        get_short_path.restype = ctypes.c_uint32
+        buffer = ctypes.create_unicode_buffer(32768)
+        length = get_short_path(str(nested_root), buffer, len(buffer))
+        if not length or length >= len(buffer):
+            self.fail("GetShortPathNameW failed")
+        alias_root = Path(buffer.value)
+        if alias_root == nested_root.resolve():
+            self.skipTest("8.3 names are disabled on this volume")
+        self.assertTrue(alias_root.samefile(nested_root))
+        with self.assertRaisesRegex(runtime_cleanup.RuntimeCleanupError, "runtime root is inside"):
+            runtime_cleanup.write_owner_marker(
+                alias_root / self.workspace_hash / "nested-alias",
+                workspace=self.workspace,
+                instance_id="nested-alias",
+                launch_id="launch-test",
+                process_id=424_242,
+            )
+        self.assertFalse((nested_instance / runtime_cleanup.OWNER_MARKER).exists())
 
 
 if __name__ == "__main__":
