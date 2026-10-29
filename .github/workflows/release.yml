@@ -36,23 +36,33 @@ jobs:
         run: node scripts/check-release.cjs version
       - name: 安装完整构建依赖（含 Electron）
         run: npm ci
+      - name: 核验已有正式版，避免重复发布
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/check-published-release.cjs
       - name: 检查测试、样式及 Schema 契约
+        if: steps.existing.outputs.published != 'true'
         run: |
           npm run verify
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python scripts/check-schema-contract.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: 准备内置 Python
+        if: steps.existing.outputs.published != 'true'
         run: ./scripts/prepare-native-runtime.ps1
       - name: 构建 Windows x64 安装包
+        if: steps.existing.outputs.published != 'true'
         run: |
           npm run icon:build
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npx --no-install electron-builder --win nsis --x64 --publish never
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: 校验安装包与更新清单
+        if: steps.existing.outputs.published != 'true'
         run: node scripts/check-release.cjs assets
       - name: 上传附件并正式发布
+        if: steps.existing.outputs.published != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
